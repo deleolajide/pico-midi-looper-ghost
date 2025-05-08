@@ -18,7 +18,7 @@ The system is designed for:
 
 The looper requires only the standard Raspberry Pi Pico hardware with no additional components, utilizing just the onboard BOOTSEL button for all interactions.
 
-[![YouTube Demo](https://img.youtube.com/vi/_J5nquZ1nLc/0.jpg)](https://www.youtube.com/shorts/_J5nquZ1nLc)
+[![YouTube Demo](https://img.youtube.com/vi/HNQDrlHFJ74/0.jpg)](https://youtube.com/shorts/HNQDrlHFJ74)
 
 ## Features
 
