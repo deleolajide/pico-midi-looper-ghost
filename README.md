@@ -42,12 +42,12 @@ The system is intentionally minimalist yet expressive, providing musicians with 
 
 > **Note:** The prebuilt `.uf2` available on the Releases page is compiled for the non-wireless Pico board and does **not** include BLE-MIDI support. To enable BLE-MIDI on a Pico W, please build from source with CYW43 enabled.
 
-You can either download a prebuilt `.uf2` from the [Releases](https://github.com/oyama/pico-midi-looper/releases/latest) page, or build it yourself.
+You can either download a prebuilt `.uf2` from the [Releases](https://github.com/oyama/pico-midi-looper-ghost/releases/latest) page, or build it yourself.
 
 To flash the firmware:
 
 1. Hold the `BOOTSEL` button while connecting your Raspberry Pi Pico via USB.
-2. Copy the `pico-midi-looper.uf2` file onto the mounted USB drive.
+2. Copy the `pico-midi-looper-ghost.uf2` file onto the mounted USB drive.
 3. The device will reboot and start running the looper.
 
 ### Connect via USB
@@ -124,7 +124,7 @@ PICO_SDK_PATH=/path/to/pico-sdk cmake ..
 make
 ```
 
-This will produce `pico‑midi‑looper.uf2` in the `build` directory.
+This will produce `pico-midi-looper-ghost.uf2` in the `build` directory.
 
 ## Architecture
 
