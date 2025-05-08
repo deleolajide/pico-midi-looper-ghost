@@ -35,7 +35,7 @@
 #define ANSI_DISABLE_ALTSCREEN "\x1b[?1049l"
 
 // Prints a single track row with step highlighting and note indicators.
-static void print_track(const char *label, const bool *steps, uint8_t current_step,
+static void print_track(const char *label, const bool *steps, const bool *ghost,  uint8_t current_step,
                         bool is_selected) {
     if (is_selected)
         printf("  " ANSI_BOLD ">%-11s [", label);
@@ -44,10 +44,17 @@ static void print_track(const char *label, const bool *steps, uint8_t current_st
 
     for (int i = 0; i < LOOPER_TOTAL_STEPS; ++i) {
         bool note_on = steps[i];
-        if (current_step == i)
-            printf(ANSI_BG_WHITE ANSI_BLACK "%s" ANSI_RESET ANSI_BOLD, (note_on ? "*" : " "));
+        bool ghost_on = ghost[i];
+        if (current_step == i && note_on)
+            printf(ANSI_BG_WHITE ANSI_BLACK "*" ANSI_RESET ANSI_BOLD);
+        else if (current_step == i && ghost_on)
+            printf(ANSI_BG_WHITE ANSI_BLACK "." ANSI_RESET ANSI_BOLD);
+        else if (current_step == i && !note_on)
+            printf(ANSI_BG_WHITE ANSI_BLACK " " ANSI_RESET ANSI_BOLD);
         else if (note_on)
             printf("*");
+        else if (ghost_on)
+            printf(".");
         else
             printf("_");
     }
@@ -97,7 +104,7 @@ void display_update_looper_status(bool output_connected, const looper_status_t *
 
     // Display tracks in order from cymbals to basses, like a typical drum machine.
     for (int8_t i = num_tracks - 1; i >= 0; i--)
-        print_track(tracks[i].name, tracks[i].pattern, looper->current_step,
+        print_track(tracks[i].name, tracks[i].pattern, tracks[i].ghost_pattern, looper->current_step,
                     i == looper->current_track);
 
     fflush(stdout);

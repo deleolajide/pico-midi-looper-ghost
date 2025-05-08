@@ -39,6 +39,7 @@ typedef struct {
     uint8_t current_step;          // Index of the current step in the sequence loop.
     uint8_t recording_step_count;  // Number of steps recorded so far in this session.
     looper_timing_t timing;
+    uint8_t ghost_bar_counter;
 } looper_status_t;
 
 // Represents each MIDI track with note and sequence pattern.
@@ -48,6 +49,7 @@ typedef struct {
     uint8_t channel;                        // MIDI channel.
     bool pattern[LOOPER_TOTAL_STEPS];       // Current active pattern
     bool hold_pattern[LOOPER_TOTAL_STEPS];  // Temporary copy saved on button down.
+    bool ghost_pattern[LOOPER_TOTAL_STEPS];
 } track_t;
 
 

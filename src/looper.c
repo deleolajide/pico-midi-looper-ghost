@@ -10,6 +10,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "drivers/ble_midi.h"
@@ -46,6 +47,13 @@ static track_t tracks[] = {
 };
 static const size_t NUM_TRACKS = sizeof(tracks) / sizeof(track_t);
 
+static uint8_t ghost_velocity_table[] = {
+    0x20, // track 1 - Kick
+    0x25, // track 2 - Snare
+    0x30, // track 3 - Hi-hat closed
+    0x25  // track 4 - Hi-hat open
+};
+
 // Check if the note output destination is ready.
 static bool looper_perform_ready(void) {
     return usb_midi_is_connected() || ble_midi_is_connected();
@@ -75,6 +83,9 @@ static void looper_perform_step(void) {
         } else if (i == looper_status.current_track) {
             led_set(0);
         }
+
+        if (tracks[i].ghost_pattern[looper_status.current_step])
+            looper_perform_note(tracks[i].channel, tracks[i].note, ghost_velocity_table[i]);
     }
 }
 
@@ -151,6 +162,24 @@ void looper_update_bpm(uint32_t bpm) {
     looper_status.step_duration_ms = 60000 / (bpm * LOOPER_STEPS_PER_BEAT);
 }
 
+static void create_ghost_notes(uint8_t target_track) {
+    track_t *track = &tracks[target_track];
+    memset(track->ghost_pattern, 0, LOOPER_TOTAL_STEPS);
+
+    for (size_t i = 0; i < LOOPER_TOTAL_STEPS; i++) {
+        if (track->pattern[i] && !track->pattern[(i + 1) % LOOPER_TOTAL_STEPS] && (rand() % 100 < 40))
+            track->ghost_pattern[(i + 1) % LOOPER_TOTAL_STEPS] = 1;
+        if (track->pattern[i] && !track->pattern[(LOOPER_TOTAL_STEPS + i - 1) % LOOPER_TOTAL_STEPS] && (rand() % 100 < 25))
+            track->ghost_pattern[(LOOPER_TOTAL_STEPS + i - 1) % LOOPER_TOTAL_STEPS] = 1;
+    }
+
+    for (int i = 0; i < LOOPER_TOTAL_STEPS; i += 2) {
+        int offbeat = (i + 1) % LOOPER_TOTAL_STEPS;
+        if (track->pattern[i] && !track->pattern[offbeat])
+            track->ghost_pattern[offbeat] = ((rand() % 100 < 40));
+    }
+}
+
 // Processes the looper's main state machine, called by the step timer.
 void looper_process_state(uint64_t start_us) {
     bool ready  = looper_perform_ready();
@@ -171,6 +200,14 @@ void looper_process_state(uint64_t start_us) {
             send_click_if_needed();
             looper_perform_step();
             looper_next_step(start_us);
+
+            if (looper_status.current_step % LOOPER_TOTAL_STEPS == 0)
+                looper_status.ghost_bar_counter++;
+            if (looper_status.ghost_bar_counter == 2) {
+                for (size_t i = 0; i < 4; i++)
+                    create_ghost_notes(i);
+                looper_status.ghost_bar_counter = 0;
+            }
             break;
         case LOOPER_STATE_RECORDING:
             send_click_if_needed();
@@ -181,6 +218,8 @@ void looper_process_state(uint64_t start_us) {
             if (looper_status.recording_step_count >= LOOPER_TOTAL_STEPS) {
                 led_set(0);
                 looper_status.state = LOOPER_STATE_PLAYING;
+                create_ghost_notes(looper_status.current_track);
+                looper_status.ghost_bar_counter = 0;
             }
             break;
         case LOOPER_STATE_TRACK_SWITCH:
@@ -222,6 +261,7 @@ void looper_handle_button_event(button_event_t event) {
                 looper_status.recording_step_count = 0;
                 looper_status.state = LOOPER_STATE_RECORDING;
                 memset(track->pattern, 0, LOOPER_TOTAL_STEPS);
+                memset(track->ghost_pattern, 0, LOOPER_TOTAL_STEPS);
             }
             uint8_t quantized_step = looper_quantize_step();
             track->pattern[quantized_step] = true;

@@ -1,7 +1,10 @@
-# Pico MIDI Looper
+# Pico MIDI Looper "Ghost" edition
 
-[![Build](https://github.com/oyama/pico-midi-looper/actions/workflows/build-firmware.yml/badge.svg)](https://github.com/oyama/pico-midi-looper/actions)
+[![Build](https://github.com/oyama/pico-midi-looper-ghost/actions/workflows/build-firmware.yml/badge.svg)](https://github.com/oyama/pico-midi-looper-ghost/actions)
 ![Price](https://img.shields.io/badge/Hardware-$4-green)
+
+`pico-midi-looper-ghost` is a derivative work of [pico-midi-looper](https://github.com/oyama/pico-midi-looper).
+It extends the original one-button USB/BLE MIDI looper with autonomous "ghost note" generation, adding subtle rhythmic variations to enhance groove and musicality.
 
 ## Overview
 
@@ -114,8 +117,8 @@ Refer to the official guide, [Getting Started with Raspberry Pi Pico](https://da
 Once ready:
 
 ```bash
-git clone https://github.com/oyama/pico-midi-looper.git
-cd pico-midi-looper
+git clone https://github.com/oyama/pico-midi-looper-ghost.git
+cd pico-midi-looper-ghost
 mkdir build && cd build
 PICO_SDK_PATH=/path/to/pico-sdk cmake ..
 make
