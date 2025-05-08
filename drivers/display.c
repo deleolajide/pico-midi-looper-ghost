@@ -71,7 +71,7 @@ void display_update_looper_status(bool output_connected, const looper_status_t *
     printf(ANSI_HIDE_CURSOR);
     printf(ANSI_CURSOR_FMT ANSI_CLEAR_EOL, 1, 1);
 
-    printf(ANSI_BOLD "\n                    #Pico_MIDI_Looper\n\n" ANSI_RESET);
+    printf(ANSI_BOLD "\n                    #Pico_MIDI_Looper \"Ghost\"\n\n" ANSI_RESET);
 
     const char *state_label = "[WAITING]";
     const char *label_color = ANSI_BRIGHT_BLUE;
