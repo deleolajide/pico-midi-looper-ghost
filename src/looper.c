@@ -18,8 +18,8 @@
 #include "drivers/led.h"
 #include "drivers/async_timer.h"
 #include "drivers/usb_midi.h"
-#include "drivers/ghost_note.h"
 
+#include "ghost_note.h"
 #include "looper.h"
 #include "tap_tempo.h"
 

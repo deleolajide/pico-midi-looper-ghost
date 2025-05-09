@@ -10,6 +10,7 @@ add_executable(${CMAKE_PROJECT_NAME}
   src/main.c
   src/looper.c
   src/tap_tempo.c
+  src/ghost_note.c
 )
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include)
 target_link_libraries(${CMAKE_PROJECT_NAME}
@@ -25,7 +26,6 @@ add_library(drivers
   drivers/display.c
   drivers/led.c
   drivers/async_timer.c
-  drivers/ghost_note.c
 )
 target_include_directories(drivers PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include)
 target_link_libraries(drivers
