@@ -10,15 +10,16 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 #include <math.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "drivers/ble_midi.h"
-#include "drivers/usb_midi.h"
 #include "drivers/button.h"
 #include "drivers/display.h"
 #include "drivers/led.h"
 #include "drivers/async_timer.h"
+#include "drivers/usb_midi.h"
+#include "drivers/ghost_note.h"
+
 #include "looper.h"
 #include "tap_tempo.h"
 
@@ -46,13 +47,6 @@ static track_t tracks[] = {
     {"Open Hi-hat", OPEN_HIHAT, MIDI_CHANNEL_10, {0}, {0}},
 };
 static const size_t NUM_TRACKS = sizeof(tracks) / sizeof(track_t);
-
-static uint8_t ghost_velocity_table[] = {
-    0x20, // track 1 - Kick
-    0x25, // track 2 - Snare
-    0x30, // track 3 - Hi-hat closed
-    0x25  // track 4 - Hi-hat open
-};
 
 // Check if the note output destination is ready.
 static bool looper_perform_ready(void) {
@@ -84,8 +78,9 @@ static void looper_perform_step(void) {
             led_set(0);
         }
 
+        uint8_t *ghost_note_velocity = ghost_note_velocity_table();
         if (tracks[i].ghost_pattern[looper_status.current_step])
-            looper_perform_note(tracks[i].channel, tracks[i].note, ghost_velocity_table[i]);
+            looper_perform_note(tracks[i].channel, tracks[i].note, ghost_note_velocity[i]);
     }
 }
 
@@ -162,24 +157,6 @@ void looper_update_bpm(uint32_t bpm) {
     looper_status.step_duration_ms = 60000 / (bpm * LOOPER_STEPS_PER_BEAT);
 }
 
-static void create_ghost_notes(uint8_t target_track) {
-    track_t *track = &tracks[target_track];
-    memset(track->ghost_pattern, 0, LOOPER_TOTAL_STEPS);
-
-    for (size_t i = 0; i < LOOPER_TOTAL_STEPS; i++) {
-        if (track->pattern[i] && !track->pattern[(i + 1) % LOOPER_TOTAL_STEPS] && (rand() % 100 < 40))
-            track->ghost_pattern[(i + 1) % LOOPER_TOTAL_STEPS] = 1;
-        if (track->pattern[i] && !track->pattern[(LOOPER_TOTAL_STEPS + i - 1) % LOOPER_TOTAL_STEPS] && (rand() % 100 < 25))
-            track->ghost_pattern[(LOOPER_TOTAL_STEPS + i - 1) % LOOPER_TOTAL_STEPS] = 1;
-    }
-
-    for (int i = 0; i < LOOPER_TOTAL_STEPS; i += 2) {
-        int offbeat = (i + 1) % LOOPER_TOTAL_STEPS;
-        if (track->pattern[i] && !track->pattern[offbeat])
-            track->ghost_pattern[offbeat] = ((rand() % 100 < 40));
-    }
-}
-
 // Processes the looper's main state machine, called by the step timer.
 void looper_process_state(uint64_t start_us) {
     bool ready  = looper_perform_ready();
@@ -205,7 +182,7 @@ void looper_process_state(uint64_t start_us) {
                 looper_status.ghost_bar_counter++;
             if (looper_status.ghost_bar_counter == 2) {
                 for (size_t i = 0; i < 4; i++)
-                    create_ghost_notes(i);
+                    ghost_note_create(&tracks[i]);
                 looper_status.ghost_bar_counter = 0;
             }
             break;
@@ -218,7 +195,7 @@ void looper_process_state(uint64_t start_us) {
             if (looper_status.recording_step_count >= LOOPER_TOTAL_STEPS) {
                 led_set(0);
                 looper_status.state = LOOPER_STATE_PLAYING;
-                create_ghost_notes(looper_status.current_track);
+                ghost_note_create(&tracks[looper_status.current_track]);
                 looper_status.ghost_bar_counter = 0;
             }
             break;
