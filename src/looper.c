@@ -121,8 +121,10 @@ static uint8_t looper_quantize_step() {
 
 // Clear all patterns in every track
 static void looper_clear_all_tracks() {
-    for (uint8_t i = 0; i < NUM_TRACKS; i++)
+    for (size_t i = 0; i < NUM_TRACKS; i++) {
         memset(tracks[i].pattern, 0, sizeof(tracks[i].pattern));
+        memset(tracks[i].ghost_pattern, 0, sizeof(tracks[i].ghost_pattern));
+    }
 }
 
 // Routes button events related to tap-tempo mode.
@@ -213,6 +215,7 @@ void looper_process_state(uint64_t start_us) {
         case LOOPER_STATE_CLEAR_TRACKS:
             looper_clear_all_tracks();
             looper_status.current_track = 0;
+            looper_update_bpm(LOOPER_DEFAULT_BPM);
             looper_next_step(start_us);
             looper_status.state = LOOPER_STATE_PLAYING;
         default:

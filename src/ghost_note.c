@@ -45,20 +45,15 @@ static void add_ghost_euclidean(track_t *track) {
 
 // 1/16th positions around the user input
 static void add_ghost_flams(track_t *track) {
-    uint8_t k = 0;
-    for (size_t i = 0; i < LOOPER_TOTAL_STEPS; i++) {
-        if (track->pattern[i])
-            k++;
-    }
-
     for (size_t i = 0; i < LOOPER_TOTAL_STEPS; i++) {
         if (track->pattern[i] && !track->pattern[(i + 1) % LOOPER_TOTAL_STEPS] &&
-            !track->ghost_pattern[i] && PROBABILITY(0.30))
-            track->ghost_pattern[(i + 1) % LOOPER_TOTAL_STEPS] = 1;
+            !track->ghost_pattern[i])
+            track->ghost_pattern[(i + 1) % LOOPER_TOTAL_STEPS] = PROBABILITY(0.30);
         if (track->pattern[i] &&
             !track->pattern[(LOOPER_TOTAL_STEPS + i - 1) % LOOPER_TOTAL_STEPS] &&
-            !track->ghost_pattern[i] && PROBABILITY(0.30))
-            track->ghost_pattern[(LOOPER_TOTAL_STEPS + i - 1) % LOOPER_TOTAL_STEPS] = 1;
+            !track->ghost_pattern[i])
+            track->ghost_pattern[(LOOPER_TOTAL_STEPS + i - 1) % LOOPER_TOTAL_STEPS] =
+                PROBABILITY(0.30);
     }
 }
 
