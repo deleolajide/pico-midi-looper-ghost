@@ -1,9 +1,12 @@
 # Pico MIDI Looper "Ghost" Edition
 
+![Social Preview](https://github.com/user-attachments/assets/6663c239-353e-4700-8ac1-3b25fa713bc6)
+
 > *Simple beats in. Ghost notes out.*  
 > "Ghost" explores how complexity and musicality can emerge from the simplest possible interface.  
 > This is not just a MIDI sequencer. It’ s a haunted drum machine.  
 > Born from a single button, running on a $4 microcontroller, it plays rhythms shaped by invisible hands.
+
 
 ## Concept and Function
 
