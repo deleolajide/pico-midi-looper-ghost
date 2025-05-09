@@ -48,7 +48,7 @@ Watch it in action:
 This project is a fork of [**pico-midi-looper**](https://github.com/oyama/pico-midi-looper), a minimal BLE/USB MIDI drum machine designed for educational and artistic use on Raspberry Pi Pico boards.  
 "Ghost" extends the original looper with generative ghost note logic and a more autonomous feel, while preserving the same ultra-minimal hardware and interface.
 
-All functionality is implemented in C using the [Pico SDK](https://github.com/raspberrypi/pico-sdk). The firmware is compact, stateless, and hackable, intended for both musical performance and embedded experimentation.
+All functionality is implemented in C using the [Pico SDK](https://github.com/raspberrypi/pico-sdk). The firmware is compact and hackable, intended for both musical performance and embedded experimentation.
 
 ## License
 
