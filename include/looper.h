@@ -50,12 +50,15 @@ typedef struct {
     bool pattern[LOOPER_TOTAL_STEPS];       // Current active pattern
     bool hold_pattern[LOOPER_TOTAL_STEPS];  // Temporary copy saved on button down.
     bool ghost_pattern[LOOPER_TOTAL_STEPS];
+    bool fill_pattern[LOOPER_TOTAL_STEPS];
 } track_t;
 
 
 void looper_status_led_init(void);
 
 looper_status_t *looper_status_get(void);
+
+track_t *looper_tracks_get(size_t *num_tracks);
 
 uint32_t looper_get_step_interval_ms(void);
 

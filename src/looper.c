@@ -9,18 +9,18 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
+#include "looper.h"
+
 #include <math.h>
 #include <string.h>
 
+#include "drivers/async_timer.h"
 #include "drivers/ble_midi.h"
 #include "drivers/button.h"
 #include "drivers/display.h"
 #include "drivers/led.h"
-#include "drivers/async_timer.h"
 #include "drivers/usb_midi.h"
-
 #include "ghost_note.h"
-#include "looper.h"
 #include "tap_tempo.h"
 
 enum {
@@ -61,8 +61,10 @@ static void looper_perform_note(uint8_t channel, uint8_t note, uint8_t velocity)
 
 // Sends a MIDI click at specific steps to indicate rhythm.
 static void send_click_if_needed(void) {
-    if ((looper_status.current_step % LOOPER_CLICK_DIV) == 0)
-        looper_perform_note(MIDI_CHANNEL_1, RIM_SHOT, 0x20);
+    if ((looper_status.current_step % LOOPER_CLICK_DIV) == 0 && looper_status.current_step == 0)
+        looper_perform_note(MIDI_CHANNEL_1, RIM_SHOT, 0x30);
+    else if ((looper_status.current_step % LOOPER_CLICK_DIV) == 0)
+        looper_perform_note(MIDI_CHANNEL_1, RIM_SHOT, 0x10);
 }
 
 // Perform all note events for the current step across all tracks.
@@ -79,8 +81,11 @@ static void looper_perform_step(void) {
         }
 
         uint8_t *ghost_note_velocity = ghost_note_velocity_table();
-        if (tracks[i].ghost_pattern[looper_status.current_step])
+        if (tracks[i].ghost_pattern[looper_status.current_step] &&
+            !tracks[i].fill_pattern[looper_status.current_step])
             looper_perform_note(tracks[i].channel, tracks[i].note, ghost_note_velocity[i]);
+        if (tracks[i].fill_pattern[looper_status.current_step] && !note_on)
+            looper_perform_note(tracks[i].channel, tracks[i].note, 0x7f);
     }
 }
 
@@ -124,6 +129,7 @@ static void looper_clear_all_tracks() {
     for (size_t i = 0; i < NUM_TRACKS; i++) {
         memset(tracks[i].pattern, 0, sizeof(tracks[i].pattern));
         memset(tracks[i].ghost_pattern, 0, sizeof(tracks[i].ghost_pattern));
+        memset(tracks[i].fill_pattern, 0, sizeof(tracks[i].fill_pattern));
     }
 }
 
@@ -144,14 +150,15 @@ static tap_result_t taptempo_handle_button_event(button_event_t event) {
 }
 
 // Return a pointer to the current looper status.
-looper_status_t *looper_status_get(void) {
-    return &looper_status;
+looper_status_t *looper_status_get(void) { return &looper_status; }
+
+track_t *looper_tracks_get(size_t *num) {
+    *num = NUM_TRACKS;
+    return tracks;
 }
 
 // Retrieve the current step interval in milliseconds.
-uint32_t looper_get_step_interval_ms(void) {
-    return looper_status.step_duration_ms;
-}
+uint32_t looper_get_step_interval_ms(void) { return looper_status.step_duration_ms; }
 
 // Update the looper BPM and recalculate the step duration.
 void looper_update_bpm(uint32_t bpm) {
@@ -161,9 +168,8 @@ void looper_update_bpm(uint32_t bpm) {
 
 // Processes the looper's main state machine, called by the step timer.
 void looper_process_state(uint64_t start_us) {
-    bool ready  = looper_perform_ready();
+    bool ready = looper_perform_ready();
     display_update_looper_status(ready, &looper_status, tracks, NUM_TRACKS);
-
     if (!ready)
         looper_status.state = LOOPER_STATE_WAITING;
     switch (looper_status.state) {
@@ -179,27 +185,17 @@ void looper_process_state(uint64_t start_us) {
             send_click_if_needed();
             looper_perform_step();
             looper_next_step(start_us);
-
-            if (looper_status.current_step % LOOPER_TOTAL_STEPS == 0)
-                looper_status.ghost_bar_counter++;
-            if (looper_status.ghost_bar_counter == 2) {
-                for (size_t i = 0; i < 4; i++)
-                    ghost_note_create(&tracks[i]);
-                looper_status.ghost_bar_counter = 0;
-            }
             break;
         case LOOPER_STATE_RECORDING:
             send_click_if_needed();
             looper_perform_step_recording();
-            looper_next_step(start_us);
-
-            looper_status.recording_step_count++;
             if (looper_status.recording_step_count >= LOOPER_TOTAL_STEPS) {
                 led_set(0);
                 looper_status.state = LOOPER_STATE_PLAYING;
                 ghost_note_create(&tracks[looper_status.current_track]);
-                looper_status.ghost_bar_counter = 0;
             }
+            looper_next_step(start_us);
+            looper_status.recording_step_count++;
             break;
         case LOOPER_STATE_TRACK_SWITCH:
             looper_status.current_track = (looper_status.current_track + 1) % NUM_TRACKS;
@@ -221,6 +217,8 @@ void looper_process_state(uint64_t start_us) {
         default:
             break;
     }
+
+    ghost_note_maintenance_step();
 }
 
 // Handles button events and updates the looper state accordingly.
