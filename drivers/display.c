@@ -35,23 +35,24 @@
 #define ANSI_DISABLE_ALTSCREEN "\x1b[?1049l"
 
 // Prints a single track row with step highlighting and note indicators.
-static void print_track(const char *label, const bool *steps, const bool *ghost,
+static void print_track(const track_t *track,
                         uint8_t current_step, bool is_selected) {
     if (is_selected)
-        printf("  " ANSI_BOLD ">%-11s [", label);
+        printf("  " ANSI_BOLD ">%-11s [", track->name);
     else
-        printf("  " ANSI_BRIGHT_BLACK " %-11s " ANSI_RESET ANSI_BOLD "[", label);
+        printf("  " ANSI_BRIGHT_BLACK " %-11s " ANSI_RESET ANSI_BOLD "[", track->name);
 
     for (int i = 0; i < LOOPER_TOTAL_STEPS; ++i) {
-        bool note_on = steps[i];
-        bool ghost_on = ghost[i];
-        if (current_step == i && note_on)
+        bool note_on = track->pattern[i];
+        bool ghost_on = track->ghost_pattern[i];
+        bool fill_on = track->fill_pattern[i];
+        if (current_step == i && (note_on || fill_on))
             printf(ANSI_BG_WHITE ANSI_BLACK "*" ANSI_RESET ANSI_BOLD);
         else if (current_step == i && ghost_on)
             printf(ANSI_BG_WHITE ANSI_BLACK "." ANSI_RESET ANSI_BOLD);
-        else if (current_step == i && !note_on)
+        else if (current_step == i && (!note_on && !fill_on))
             printf(ANSI_BG_WHITE ANSI_BLACK " " ANSI_RESET ANSI_BOLD);
-        else if (note_on)
+        else if (note_on || fill_on)
             printf("*");
         else if (ghost_on)
             printf(".");
@@ -104,15 +105,8 @@ void display_update_looper_status(bool output_connected, const looper_status_t *
 
     // Display tracks in order from cymbals to basses, like a typical drum machine.
     for (int8_t i = num_tracks - 1; i >= 0; i--)
-        print_track(tracks[i].name, tracks[i].pattern, tracks[i].ghost_pattern,
+        print_track(&tracks[i],
                     looper->current_step, i == looper->current_track);
-
-    if (looper->state == LOOPER_STATE_PLAYING && looper->ghost_bar_counter == 1 &&
-        looper->current_step >= 0)
-        printf(ANSI_BRIGHT_BLACK "\n                Here it comes..." ANSI_RESET);
-    if (looper->state == LOOPER_STATE_PLAYING && looper->ghost_bar_counter == 1 &&
-        looper->current_step >= 28)
-        printf(ANSI_BRIGHT_BLACK " Now!\n" ANSI_RESET);
 
     fflush(stdout);
 }

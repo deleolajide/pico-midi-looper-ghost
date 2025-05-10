@@ -63,3 +63,29 @@ void ghost_note_create(track_t *track) {
     add_ghost_euclidean(track);
     add_ghost_flams(track);
 }
+
+void ghost_note_maintenance_step(void) {
+    looper_status_t *looper_status = looper_status_get();
+    size_t num_tracks;
+    track_t *tracks = looper_tracks_get(&num_tracks);
+
+    if (looper_status->current_step % (LOOPER_TOTAL_STEPS / 2) == 0)
+        looper_status->ghost_bar_counter = (looper_status->ghost_bar_counter + 1) % 4;
+
+    const uint16_t fill_start = (float)LOOPER_TOTAL_STEPS * (3.0 / 4);
+
+    if (looper_status->ghost_bar_counter == 0 && looper_status->current_step == 0) {
+        for (size_t i = 0; i < num_tracks; i++) {
+            ghost_note_create(&tracks[i]);
+            memset(tracks[i].fill_pattern, 0, sizeof(tracks[i].fill_pattern));
+        }
+    } else if (looper_status->ghost_bar_counter == 2 && looper_status->current_step == 0) {
+        for (size_t i = 0; i < num_tracks; i++) {
+            for (size_t f = fill_start; f < LOOPER_TOTAL_STEPS; f++) {
+                if (tracks[i].ghost_pattern[f]) {
+                    tracks[i].fill_pattern[f] = PROBABILITY(0.90);
+                }
+            }
+        }
+    }
+}
