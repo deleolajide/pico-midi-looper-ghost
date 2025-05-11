@@ -15,6 +15,32 @@ static uint8_t velocity_table[] = {
 
 uint8_t *ghost_note_velocity_table(void) { return velocity_table; }
 
+static double rand_standard_normal(void) {
+    static int has_spare = 0;
+    static double spare;
+    if (has_spare) {
+        has_spare = 0;
+        return spare;
+    }
+    has_spare = 1;
+
+    double u, v, s;
+    do {
+        u = rand() / (double)RAND_MAX * 2.0 - 1.0;
+        v = rand() / (double)RAND_MAX * 2.0 - 1.0;
+        s = u*u + v*v;
+    } while (s >= 1.0 || s == 0.0);
+
+    s = sqrt(-2.0 * log(s) / s);
+    spare = v * s;
+    return u * s;
+}
+
+double rand_normal(double mu, double sigma2) {
+    double sigma = sqrt(sigma2);
+    return mu + sigma * rand_standard_normal();
+}
+
 // euclidean rhythm algorithm
 static void add_ghost_euclidean(track_t *track) {
     uint8_t k = 0;
@@ -72,19 +98,17 @@ void ghost_note_maintenance_step(void) {
     if (looper_status->current_step % (LOOPER_TOTAL_STEPS / 2) == 0)
         looper_status->ghost_bar_counter = (looper_status->ghost_bar_counter + 1) % 4;
 
-    const uint16_t fill_start = (float)LOOPER_TOTAL_STEPS * (3.0 / 4);
-
     if (looper_status->ghost_bar_counter == 0 && looper_status->current_step == 0) {
         for (size_t i = 0; i < num_tracks; i++) {
             ghost_note_create(&tracks[i]);
             memset(tracks[i].fill_pattern, 0, sizeof(tracks[i].fill_pattern));
         }
     } else if (looper_status->ghost_bar_counter == 2 && looper_status->current_step == 0) {
+        uint16_t fill_start = LOOPER_TOTAL_STEPS - abs(rand_normal(10.0, 5.0));
         for (size_t i = 0; i < num_tracks; i++) {
             for (size_t f = fill_start; f < LOOPER_TOTAL_STEPS; f++) {
-                if (tracks[i].ghost_pattern[f]) {
+                if (tracks[i].ghost_pattern[f])
                     tracks[i].fill_pattern[f] = PROBABILITY(0.90);
-                }
             }
         }
     }
