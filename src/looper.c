@@ -209,7 +209,6 @@ void looper_process_state(uint64_t start_us) {
             if (looper_status.recording_step_count >= LOOPER_TOTAL_STEPS) {
                 led_set(0);
                 looper_status.state = LOOPER_STATE_PLAYING;
-                ghost_note_create(&tracks[looper_status.current_track]);
             }
             looper_next_step(start_us);
             looper_status.recording_step_count++;
@@ -258,6 +257,7 @@ void looper_handle_button_event(button_event_t event) {
                 looper_status.state = LOOPER_STATE_RECORDING;
                 memset(track->pattern, 0, LOOPER_TOTAL_STEPS);
                 memset(track->ghost_pattern, 0, LOOPER_TOTAL_STEPS);
+                memset(track->fill_pattern, 0, LOOPER_TOTAL_STEPS);
             }
             uint8_t quantized_step = looper_quantize_step();
             track->pattern[quantized_step] = true;
