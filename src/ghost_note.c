@@ -9,8 +9,8 @@
 
 static ghost_parameters_t parameters = {
     .flams = {
-        .post_probability = 0.70,
-        .after_probability = 0.30},
+        .post_probability = 0.30,
+        .after_probability = 0.70},
     .euclidean = {
         .k_max = 16,
         .k_sufficient = 6,
@@ -109,12 +109,12 @@ static void add_ghost_flams(track_t *track) {
         if (track->pattern[i] && !track->pattern[(i + 1) % LOOPER_TOTAL_STEPS] &&
             !track->ghost_pattern[i])
             track->ghost_pattern[(i + 1) % LOOPER_TOTAL_STEPS] =
-                PROBABILITY(flams->after_probability);
+                PROBABILITY(flams->post_probability);
         if (track->pattern[i] &&
             !track->pattern[(LOOPER_TOTAL_STEPS + i - 1) % LOOPER_TOTAL_STEPS] &&
             !track->ghost_pattern[i])
             track->ghost_pattern[(LOOPER_TOTAL_STEPS + i - 1) % LOOPER_TOTAL_STEPS] =
-                PROBABILITY(flams->post_probability);
+                PROBABILITY(flams->after_probability);
     }
 }
 
