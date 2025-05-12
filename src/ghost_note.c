@@ -7,6 +7,21 @@
 
 #define PROBABILITY(p) ((rand() / (RAND_MAX + 1.0)) < (p))
 
+static ghost_parameters_t parameters = {
+    .flams = {
+        .post_probability = 0.70,
+        .after_probability = 0.30},
+    .euclidean = {
+        .k_max = 16,
+        .k_sufficient = 6,
+        .k_intensity = 0.60,
+        .probability = 0.70},
+    .fill = {
+        .start_mean = 15.0,
+        .start_sd = 5.0,
+        .probability = 0.75},
+};
+
 static uint8_t velocity_table[] = {
     0x20,  // track 1 - Kick
     0x25,  // track 2 - Snare
@@ -41,21 +56,6 @@ double rand_normal(double mu, double sigma2) {
     double sigma = sqrt(sigma2);
     return mu + sigma * rand_standard_normal();
 }
-
-static ghost_parameters_t parameters = {
-    .euclidean = {
-        .k_max = 16,
-        .k_sufficient = 6,
-        .k_intensity = 0.50,
-        .probability = 0.80},
-    .flams = {
-        .post_probability = 0.30,
-        .after_probability = 0.30},
-    .fill = {
-        .start_mean = 10.0,
-        .start_sd = 5.0,
-        .probability = 0.90},
-};
 
 static inline int clamp_int(int x, int lo, int hi) {
     if (x < lo)
