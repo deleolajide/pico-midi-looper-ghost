@@ -40,6 +40,7 @@ typedef struct {
     uint8_t recording_step_count;  // Number of steps recorded so far in this session.
     looper_timing_t timing;
     uint8_t ghost_bar_counter;
+    uint16_t lfo_phase;
 } looper_status_t;
 
 // Represents each MIDI track with note and sequence pattern.
