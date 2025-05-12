@@ -1,25 +1,18 @@
+#include "ghost_note.h"
+
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "looper.h"
-#include "ghost_note.h"
 
 #define PROBABILITY(p) ((rand() / (RAND_MAX + 1.0)) < (p))
 
 static ghost_parameters_t parameters = {
-    .flams = {
-        .post_probability = 0.30,
-        .after_probability = 0.70},
-    .euclidean = {
-        .k_max = 16,
-        .k_sufficient = 6,
-        .k_intensity = 0.60,
-        .probability = 0.70},
-    .fill = {
-        .start_mean = 15.0,
-        .start_sd = 5.0,
-        .probability = 0.75},
+    .ghost_intensity = 1.0,
+    .flams = {.post_probability = 0.30, .after_probability = 0.30},
+    .euclidean = {.k_max = 16, .k_sufficient = 6, .k_intensity = 0.60, .probability = 0.70},
+    .fill = {.start_mean = 15.0, .start_sd = 5.0, .probability = 0.75},
 };
 
 static uint8_t velocity_table[] = {
@@ -96,7 +89,8 @@ static void add_ghost_euclidean(track_t *track) {
             size_t pos = (i + phase) % LOOPER_TOTAL_STEPS;
 
             if (!track->pattern[pos] && !track->ghost_pattern[pos])
-                track->ghost_pattern[pos] = PROBABILITY(euclidean->probability * (1.0f - density));
+                track->ghost_pattern[pos] = PROBABILITY(euclidean->probability * (1.0f - density) *
+                                                        parameters.ghost_intensity);
         }
     }
 }
@@ -109,12 +103,12 @@ static void add_ghost_flams(track_t *track) {
         if (track->pattern[i] && !track->pattern[(i + 1) % LOOPER_TOTAL_STEPS] &&
             !track->ghost_pattern[i])
             track->ghost_pattern[(i + 1) % LOOPER_TOTAL_STEPS] =
-                PROBABILITY(flams->post_probability);
+                PROBABILITY(flams->post_probability * parameters.ghost_intensity);
         if (track->pattern[i] &&
             !track->pattern[(LOOPER_TOTAL_STEPS + i - 1) % LOOPER_TOTAL_STEPS] &&
             !track->ghost_pattern[i])
             track->ghost_pattern[(LOOPER_TOTAL_STEPS + i - 1) % LOOPER_TOTAL_STEPS] =
-                PROBABILITY(flams->after_probability);
+                PROBABILITY(flams->after_probability * parameters.ghost_intensity);
     }
 }
 
@@ -140,16 +134,16 @@ void ghost_note_maintenance_step(void) {
             memset(tracks[i].fill_pattern, 0, sizeof(tracks[i].fill_pattern));
         }
     } else if (looper_status->ghost_bar_counter == 2 && looper_status->current_step == 0) {
-        uint16_t fill_start = LOOPER_TOTAL_STEPS - abs(rand_normal(fill->start_mean, fill->start_sd));
+        uint16_t fill_start =
+            LOOPER_TOTAL_STEPS - abs(rand_normal(fill->start_mean, fill->start_sd));
         for (size_t i = 0; i < num_tracks; i++) {
             for (size_t f = fill_start; f < LOOPER_TOTAL_STEPS; f++) {
                 if (tracks[i].ghost_pattern[f])
-                    tracks[i].fill_pattern[f] = PROBABILITY(fill->probability);
+                    tracks[i].fill_pattern[f] =
+                        PROBABILITY(fill->probability * parameters.ghost_intensity);
             }
         }
     }
 }
 
-ghost_parameters_t *ghost_note_parameters(void) {
-    return &parameters;
-}
+ghost_parameters_t *ghost_note_parameters(void) { return &parameters; }

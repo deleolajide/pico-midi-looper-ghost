@@ -48,6 +48,13 @@ static track_t tracks[] = {
 };
 static const size_t NUM_TRACKS = sizeof(tracks) / sizeof(track_t);
 
+#define LFO_RATE (65536 / (5 * LOOPER_BEATS_PER_BAR * LOOPER_STEPS_PER_BEAT))
+#define KICK_VEL_BASE 100
+#define KICK_VEL_DEPTH 25
+#define HH_FREQ_RATIO 2
+#define HH_VEL_BASE 107
+#define HH_VEL_DEPTH 20
+
 // Check if the note output destination is ready.
 static bool looper_perform_ready(void) {
     return usb_midi_is_connected() || ble_midi_is_connected();
@@ -73,7 +80,17 @@ static void looper_perform_step(void) {
     for (uint8_t i = 0; i < NUM_TRACKS; i++) {
         bool note_on = tracks[i].pattern[looper_status.current_step];
         if (note_on) {
-            looper_perform_note(tracks[i].channel, tracks[i].note, 0x7f);
+            uint8_t velocity = 0x7f;
+            if (i == 0) {
+                float phase = (looper_status.lfo_phase / 65536.0f) * 2.0f * M_PI; /* 0-2π */
+                float kick_s = sinf(phase);
+                velocity = KICK_VEL_BASE + (int)(kick_s * KICK_VEL_DEPTH);
+            } else if (i == 2) {
+                uint16_t hh_phase = (uint32_t)looper_status.lfo_phase * HH_FREQ_RATIO; /* wrap */
+                float hh_s = sinf((hh_phase / 65536.0f) * 2.0f * M_PI);
+                velocity = HH_VEL_BASE + (int)(hh_s * HH_VEL_DEPTH);
+            }
+            looper_perform_note(tracks[i].channel, tracks[i].note, velocity);
             if (i == looper_status.current_track)
                 led_set(1);
         } else if (i == looper_status.current_track) {
@@ -192,7 +209,6 @@ void looper_process_state(uint64_t start_us) {
             if (looper_status.recording_step_count >= LOOPER_TOTAL_STEPS) {
                 led_set(0);
                 looper_status.state = LOOPER_STATE_PLAYING;
-                ghost_note_create(&tracks[looper_status.current_track]);
             }
             looper_next_step(start_us);
             looper_status.recording_step_count++;
@@ -218,6 +234,7 @@ void looper_process_state(uint64_t start_us) {
             break;
     }
 
+    looper_status.lfo_phase += LFO_RATE;
     ghost_note_maintenance_step();
 }
 
@@ -240,6 +257,7 @@ void looper_handle_button_event(button_event_t event) {
                 looper_status.state = LOOPER_STATE_RECORDING;
                 memset(track->pattern, 0, LOOPER_TOTAL_STEPS);
                 memset(track->ghost_pattern, 0, LOOPER_TOTAL_STEPS);
+                memset(track->fill_pattern, 0, LOOPER_TOTAL_STEPS);
             }
             uint8_t quantized_step = looper_quantize_step();
             track->pattern[quantized_step] = true;
