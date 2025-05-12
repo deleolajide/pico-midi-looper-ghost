@@ -155,6 +155,8 @@ static void set_ghost_parameters(uint8_t channel, uint8_t cc, uint8_t value) {
 
     ghost_parameters_t *params = ghost_note_parameters();
     switch (cc) {
+        case 11:
+            params->ghost_intensity = value / 127.0f;
         case 71:  // k_max (1-16)
             params->euclidean.k_max = (uint8_t)clamp((int)value, 1, params->euclidean.k_max);
             break;

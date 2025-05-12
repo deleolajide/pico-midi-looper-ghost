@@ -22,6 +22,7 @@ typedef struct {
 } fill_parameters_t;
 
 typedef struct {
+    float ghost_intensity;
     flams_parameters_t flams;
     euclidean_parameters_t euclidean;
     fill_parameters_t fill;

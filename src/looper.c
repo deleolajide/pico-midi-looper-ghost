@@ -48,12 +48,12 @@ static track_t tracks[] = {
 };
 static const size_t NUM_TRACKS = sizeof(tracks) / sizeof(track_t);
 
-#define LFO_RATE         (65536 / (5 * LOOPER_BEATS_PER_BAR * LOOPER_STEPS_PER_BEAT))
-#define KICK_VEL_BASE    100
-#define KICK_VEL_DEPTH   25
-#define HH_FREQ_RATIO    2
-#define HH_VEL_BASE      107
-#define HH_VEL_DEPTH     20
+#define LFO_RATE (65536 / (5 * LOOPER_BEATS_PER_BAR * LOOPER_STEPS_PER_BEAT))
+#define KICK_VEL_BASE 100
+#define KICK_VEL_DEPTH 25
+#define HH_FREQ_RATIO 2
+#define HH_VEL_BASE 107
+#define HH_VEL_DEPTH 20
 
 // Check if the note output destination is ready.
 static bool looper_perform_ready(void) {
@@ -82,8 +82,8 @@ static void looper_perform_step(void) {
         if (note_on) {
             uint8_t velocity = 0x7f;
             if (i == 0) {
-                float phase   = (looper_status.lfo_phase / 65536.0f) * 2.0f * M_PI;   /* 0-2π */
-                float kick_s  = sinf(phase);
+                float phase = (looper_status.lfo_phase / 65536.0f) * 2.0f * M_PI; /* 0-2π */
+                float kick_s = sinf(phase);
                 velocity = KICK_VEL_BASE + (int)(kick_s * KICK_VEL_DEPTH);
             } else if (i == 2) {
                 uint16_t hh_phase = (uint32_t)looper_status.lfo_phase * HH_FREQ_RATIO; /* wrap */
