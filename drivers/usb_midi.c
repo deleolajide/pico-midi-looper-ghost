@@ -3,6 +3,7 @@
 #include "bsp/board_api.h"
 #include "pico/bootrom.h"
 #include "tusb.h"
+#include "ghost_note.h"
 
 #define _PID_MAP(itf, n) ((CFG_TUD_##itf) << (n))
 #define USB_PID                                                                            \
@@ -140,11 +141,62 @@ void usb_midi_send_note(uint8_t channel, uint8_t note, uint8_t velocity) {
     tud_midi_stream_write(cable_num, note_off, sizeof(note_off));
 }
 
+static inline int clamp(int x, int lo, int hi) {
+    if (x < lo)
+        return lo;
+    if (x > hi)
+        return hi;
+    return x;
+}
+
+static void set_ghost_parameters(uint8_t channel, uint8_t cc, uint8_t value) {
+    if (channel != 15)
+        return;
+
+    ghost_parameters_t *params = ghost_note_parameters();
+    switch (cc) {
+        case 71:  // k_max (1-16)
+            params->euclidean.k_max = (uint8_t)clamp((int)value, 1, params->euclidean.k_max);
+            break;
+        case 72:  // k_sufficient (0-k_max)
+            params->euclidean.k_sufficient = (uint8_t)clamp((int)value, 0, params->euclidean.k_max);
+            break;
+        case 73:  // k_intensity (0.0-1.0)
+            params->euclidean.k_intensity = value / 127.0f;
+            break;
+        case 74:  // probability (0.0-1.0)
+            params->euclidean.probability = value / 127.0f;
+            break;
+        case 75:  // post_probability (0.0-1.0)
+            params->flams.post_probability = value / 127.0f;
+            break;
+        case 76:  // after_probability (0.0-1.0)
+            params->flams.after_probability = value / 127.0f;
+            break;
+        case 77:  // start_mean (0.0-MAX_MEAN)
+            params->fill.start_mean = (value / 127.0f) * 32;
+            break;
+        case 78:  // start_sd (0.0-MAX_SD)
+            params->fill.start_sd   = (value / 127.0f) * 16;
+            break;
+        case 79:  // probability (0.0-1.0)
+            params->fill.probability = value / 127.0f;
+            break;
+        default:
+            break;
+    }
+}
+
 void usb_midi_task(void) {
     tud_task();
 
     while (tud_midi_available()) {
         uint8_t packet[4];
         tud_midi_packet_read(packet);
+        uint8_t status = packet[1];
+        uint8_t channel = status & 0x0F;
+        uint8_t message = status & 0xF0;
+        if (message == 0xB0)
+            set_ghost_parameters(channel, packet[2], packet[3]);
     }
 }
