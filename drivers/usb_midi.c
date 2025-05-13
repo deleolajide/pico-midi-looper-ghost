@@ -149,39 +149,52 @@ static inline int clamp(int x, int lo, int hi) {
     return x;
 }
 
+enum {
+    MIDI_CC_EXPRESSION = 11,
+    MIDI_CC_SOUND_CONTROLLER2 = 71,
+    MIDI_CC_SOUND_CONTROLLER3 = 72,
+    MIDI_CC_SOUND_CONTROLLER4 = 73,
+    MIDI_CC_SOUND_CONTROLLER5 = 74,
+    MIDI_CC_SOUND_CONTROLLER6 = 75,
+    MIDI_CC_SOUND_CONTROLLER7 = 76,
+    MIDI_CC_SOUND_CONTROLLER8 = 77,
+    MIDI_CC_SOUND_CONTROLLER9 = 78,
+    MIDI_CC_SOUND_CONTROLLER10 = 79,
+};
+
 static void set_ghost_parameters(uint8_t channel, uint8_t cc, uint8_t value) {
     if (channel != 15)
         return;
 
     ghost_parameters_t *params = ghost_note_parameters();
     switch (cc) {
-        case 11:
+        case MIDI_CC_EXPRESSION:
             params->ghost_intensity = value / 127.0f;
-        case 71:  // k_max (1-16)
+        case MIDI_CC_SOUND_CONTROLLER2:  // euclidean k_max (1-16)
             params->euclidean.k_max = (uint8_t)clamp((int)value, 1, params->euclidean.k_max);
             break;
-        case 72:  // k_sufficient (0-k_max)
+        case MIDI_CC_SOUND_CONTROLLER3:  // euclidean k_sufficient (0-k_max)
             params->euclidean.k_sufficient = (uint8_t)clamp((int)value, 0, params->euclidean.k_max);
             break;
-        case 73:  // k_intensity (0.0-1.0)
+        case MIDI_CC_SOUND_CONTROLLER4:  // euclidean k_intensity (0.0-1.0)
             params->euclidean.k_intensity = value / 127.0f;
             break;
-        case 74:  // probability (0.0-1.0)
+        case MIDI_CC_SOUND_CONTROLLER5:  // euclidean probability (0.0-1.0)
             params->euclidean.probability = value / 127.0f;
             break;
-        case 75:  // post_probability (0.0-1.0)
-            params->flams.post_probability = value / 127.0f;
+        case MIDI_CC_SOUND_CONTROLLER6:  // flame before_probability (0.0-1.0)
+            params->flams.before_probability = value / 127.0f;
             break;
-        case 76:  // after_probability (0.0-1.0)
+        case MIDI_CC_SOUND_CONTROLLER7:  // flame after_probability (0.0-1.0)
             params->flams.after_probability = value / 127.0f;
             break;
-        case 77:  // start_mean (0.0-MAX_MEAN)
+        case MIDI_CC_SOUND_CONTROLLER8:  // fill start_mean (0.0-MAX_MEAN)
             params->fill.start_mean = (value / 127.0f) * 32;
             break;
-        case 78:  // start_sd (0.0-MAX_SD)
+        case MIDI_CC_SOUND_CONTROLLER9:  // fill start_sd (0.0-MAX_SD)
             params->fill.start_sd   = (value / 127.0f) * 16;
             break;
-        case 79:  // probability (0.0-1.0)
+        case MIDI_CC_SOUND_CONTROLLER10:  // fill probability (0.0-1.0)
             params->fill.probability = value / 127.0f;
             break;
         default:

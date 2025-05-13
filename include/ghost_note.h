@@ -11,7 +11,7 @@ typedef struct {
 } euclidean_parameters_t;
 
 typedef struct {
-    float post_probability;
+    float before_probability;
     float after_probability;
 } flams_parameters_t;
 

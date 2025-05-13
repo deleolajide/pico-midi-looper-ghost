@@ -97,7 +97,7 @@ void display_update_looper_status(bool output_connected, const looper_status_t *
     }
     printf("   %s%-12s%s", label_color, state_label, ANSI_RESET);
 
-    printf(" %s♩=%u\n" ANSI_RESET,
+    printf(" %s♩=%3u\n" ANSI_RESET,
            ((looper->current_step % LOOPER_CLICK_DIV) == 0 ? ANSI_BOLD : ANSI_BRIGHT_BLACK),
            looper->bpm);
 
