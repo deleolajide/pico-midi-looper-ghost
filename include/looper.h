@@ -12,6 +12,8 @@
 #define LOOPER_TOTAL_STEPS (LOOPER_STEPS_PER_BEAT * LOOPER_BEATS_PER_BAR * LOOPER_BARS)
 #define LOOPER_CLICK_DIV (LOOPER_TOTAL_STEPS / LOOPER_BARS / LOOPER_STEPS_PER_BEAT )
 
+#define LFO_RATE (65536 / (5 * LOOPER_BEATS_PER_BAR * LOOPER_STEPS_PER_BEAT))
+
 // Represents the current playback or recording state.
 typedef enum {
     LOOPER_STATE_WAITING = 0,   // BLE not connected, waiting.

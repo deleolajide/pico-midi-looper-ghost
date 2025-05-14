@@ -31,6 +31,8 @@ typedef struct {
 
 uint8_t *ghost_note_velocity_table(void);
 
+uint8_t ghost_note_modulate_base_velocity(uint8_t track_num, uint8_t default_velocity, float lfo);
+
 void ghost_note_create(track_t *track);
 
 void ghost_note_maintenance_step(void);

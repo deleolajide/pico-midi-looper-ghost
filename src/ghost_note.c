@@ -28,6 +28,25 @@ static uint8_t velocity_table[] = {
 
 uint8_t *ghost_note_velocity_table(void) { return velocity_table; }
 
+#define KICK_VEL_BASE 100
+#define KICK_VEL_DEPTH 25
+#define HH_FREQ_RATIO 2
+#define HH_VEL_BASE 107
+#define HH_VEL_DEPTH 20
+
+uint8_t ghost_note_modulate_base_velocity(uint8_t track_num, uint8_t default_velocity, float lfo) {
+    if (track_num == 0) { // Kick
+        float phase = (lfo / 65536.0f) * 2.0f * M_PI; /* 0-2π */
+        float kick_s = sinf(phase);
+        return KICK_VEL_BASE + (int)(kick_s * KICK_VEL_DEPTH);
+    } else if (track_num == 2) { // Closed Hi-hat
+        uint16_t hh_phase = (uint32_t)lfo * HH_FREQ_RATIO; /* wrap */
+        float hh_s = sinf((hh_phase / 65536.0f) * 2.0f * M_PI);
+        return HH_VEL_BASE + (int)(hh_s * HH_VEL_DEPTH);
+    }
+    return default_velocity;
+}
+
 static double rand_standard_normal(void) {
     static int has_spare = 0;
     static double spare;

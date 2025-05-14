@@ -9,8 +9,6 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-#include "looper.h"
-
 #include <math.h>
 #include <string.h>
 
@@ -20,12 +18,13 @@
 #include "drivers/display.h"
 #include "drivers/led.h"
 #include "drivers/usb_midi.h"
+#include "looper.h"
 #include "ghost_note.h"
 #include "tap_tempo.h"
 
 enum {
-    MIDI_CHANNEL_1 = 0,
-    MIDI_CHANNEL_10 = 9,
+    MIDI_CHANNEL1 = 0,
+    MIDI_CHANNEL10 = 9,
 };
 
 enum {
@@ -41,19 +40,12 @@ enum {
 static looper_status_t looper_status = {.bpm = LOOPER_DEFAULT_BPM, .state = LOOPER_STATE_WAITING};
 
 static track_t tracks[] = {
-    {"Bass", BASS_DRUM, MIDI_CHANNEL_10, {0}, {0}},
-    {"Snare", SNARE_DRUM, MIDI_CHANNEL_10, {0}, {0}},
-    {"Hi-hat", CLOSED_HIHAT, MIDI_CHANNEL_10, {0}, {0}},
-    {"Open Hi-hat", OPEN_HIHAT, MIDI_CHANNEL_10, {0}, {0}},
+    {"Bass", BASS_DRUM, MIDI_CHANNEL10, {0}, {0}},
+    {"Snare", SNARE_DRUM, MIDI_CHANNEL10, {0}, {0}},
+    {"Hi-hat", CLOSED_HIHAT, MIDI_CHANNEL10, {0}, {0}},
+    {"Open Hi-hat", OPEN_HIHAT, MIDI_CHANNEL10, {0}, {0}},
 };
 static const size_t NUM_TRACKS = sizeof(tracks) / sizeof(track_t);
-
-#define LFO_RATE (65536 / (5 * LOOPER_BEATS_PER_BAR * LOOPER_STEPS_PER_BEAT))
-#define KICK_VEL_BASE 100
-#define KICK_VEL_DEPTH 25
-#define HH_FREQ_RATIO 2
-#define HH_VEL_BASE 107
-#define HH_VEL_DEPTH 20
 
 // Check if the note output destination is ready.
 static bool looper_perform_ready(void) {
@@ -69,9 +61,9 @@ static void looper_perform_note(uint8_t channel, uint8_t note, uint8_t velocity)
 // Sends a MIDI click at specific steps to indicate rhythm.
 static void send_click_if_needed(void) {
     if ((looper_status.current_step % LOOPER_CLICK_DIV) == 0 && looper_status.current_step == 0)
-        looper_perform_note(MIDI_CHANNEL_1, RIM_SHOT, 0x30);
+        looper_perform_note(MIDI_CHANNEL1, RIM_SHOT, 0x30);
     else if ((looper_status.current_step % LOOPER_CLICK_DIV) == 0)
-        looper_perform_note(MIDI_CHANNEL_1, RIM_SHOT, 0x10);
+        looper_perform_note(MIDI_CHANNEL1, RIM_SHOT, 0x10);
 }
 
 // Perform all note events for the current step across all tracks.
@@ -80,16 +72,7 @@ static void looper_perform_step(void) {
     for (uint8_t i = 0; i < NUM_TRACKS; i++) {
         bool note_on = tracks[i].pattern[looper_status.current_step];
         if (note_on) {
-            uint8_t velocity = 0x7f;
-            if (i == 0) {
-                float phase = (looper_status.lfo_phase / 65536.0f) * 2.0f * M_PI; /* 0-2π */
-                float kick_s = sinf(phase);
-                velocity = KICK_VEL_BASE + (int)(kick_s * KICK_VEL_DEPTH);
-            } else if (i == 2) {
-                uint16_t hh_phase = (uint32_t)looper_status.lfo_phase * HH_FREQ_RATIO; /* wrap */
-                float hh_s = sinf((hh_phase / 65536.0f) * 2.0f * M_PI);
-                velocity = HH_VEL_BASE + (int)(hh_s * HH_VEL_DEPTH);
-            }
+            uint8_t velocity = ghost_note_modulate_base_velocity(i, 0x7f, looper_status.lfo_phase);
             looper_perform_note(tracks[i].channel, tracks[i].note, velocity);
             if (i == looper_status.current_track)
                 led_set(1);
@@ -110,7 +93,6 @@ static void looper_perform_step(void) {
 // In recording mode, the status LED is always turned on.
 static void looper_perform_step_recording(void) {
     led_set(1);
-
     for (uint8_t i = 0; i < NUM_TRACKS; i++) {
         bool note_on = tracks[i].pattern[looper_status.current_step];
         if (note_on)
@@ -215,7 +197,7 @@ void looper_process_state(uint64_t start_us) {
             break;
         case LOOPER_STATE_TRACK_SWITCH:
             looper_status.current_track = (looper_status.current_track + 1) % NUM_TRACKS;
-            looper_perform_note(MIDI_CHANNEL_10, HAND_CLAP, 0x7f);
+            looper_perform_note(MIDI_CHANNEL10, HAND_CLAP, 0x7f);
             looper_next_step(start_us);
             looper_status.state = LOOPER_STATE_PLAYING;
             break;
@@ -255,9 +237,7 @@ void looper_handle_button_event(button_event_t event) {
             if (looper_status.state != LOOPER_STATE_RECORDING) {
                 looper_status.recording_step_count = 0;
                 looper_status.state = LOOPER_STATE_RECORDING;
-                memset(track->pattern, 0, LOOPER_TOTAL_STEPS);
-                memset(track->ghost_pattern, 0, LOOPER_TOTAL_STEPS);
-                memset(track->fill_pattern, 0, LOOPER_TOTAL_STEPS);
+                looper_clear_all_tracks();
             }
             uint8_t quantized_step = looper_quantize_step();
             track->pattern[quantized_step] = true;
@@ -270,12 +250,12 @@ void looper_handle_button_event(button_event_t event) {
         case BUTTON_EVENT_LONG_HOLD_RELEASE:
             // ≥2 s hold: enter Tap-tempo (no track switch)
             looper_status.state = LOOPER_STATE_TAP_TEMPO;
-            looper_perform_note(MIDI_CHANNEL_10, HAND_CLAP, 0x7f);
+            looper_perform_note(MIDI_CHANNEL10, HAND_CLAP, 0x7f);
             break;
         case BUTTON_EVENT_VERY_LONG_HOLD_RELEASE:
             // ≥5 s hold: clear track data
             looper_status.state = LOOPER_STATE_CLEAR_TRACKS;
-            looper_perform_note(MIDI_CHANNEL_10, HAND_CLAP, 0x7f);
+            looper_perform_note(MIDI_CHANNEL10, HAND_CLAP, 0x7f);
             break;
         default:
             break;
@@ -293,7 +273,6 @@ void looper_handle_tick(async_context_t *ctx, async_at_time_worker_t *worker) {
     uint32_t delay = (handler_delay_ms >= looper_status.step_duration_ms)
                          ? 1
                          : looper_status.step_duration_ms - handler_delay_ms;
-
     async_context_add_at_time_worker_in_ms(ctx, worker, delay);
 }
 
@@ -301,9 +280,8 @@ void looper_handle_tick(async_context_t *ctx, async_at_time_worker_t *worker) {
 void looper_handle_input(void) {
     button_event_t event = button_poll_event();
     if (looper_status.state == LOOPER_STATE_TAP_TEMPO) {
-        if (taptempo_handle_button_event(event) == TAP_EXIT) {
+        if (taptempo_handle_button_event(event) == TAP_EXIT)
             looper_status.state = LOOPER_STATE_PLAYING;
-        }
     } else {
         looper_handle_button_event(event);
     }
