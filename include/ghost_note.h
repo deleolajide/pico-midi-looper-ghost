@@ -16,6 +16,7 @@ typedef struct {
 } flams_parameters_t;
 
 typedef struct {
+    uint8_t interval_bar;
     float start_mean;
     float start_sd;
     float probability;

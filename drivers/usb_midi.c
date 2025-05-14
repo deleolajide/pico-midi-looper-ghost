@@ -1,5 +1,3 @@
-#include <stdio.h>
-
 #include "bsp/board_api.h"
 #include "pico/bootrom.h"
 #include "tusb.h"
@@ -160,6 +158,7 @@ enum {
     MIDI_CC_SOUND_CONTROLLER8 = 77,
     MIDI_CC_SOUND_CONTROLLER9 = 78,
     MIDI_CC_SOUND_CONTROLLER10 = 79,
+    MIDI_CC_SOUND_CONTROLLER11 = 80,
 };
 
 static void update_ghost_parameters(uint8_t channel, uint8_t cc, uint8_t value) {
@@ -196,6 +195,9 @@ static void update_ghost_parameters(uint8_t channel, uint8_t cc, uint8_t value) 
             break;
         case MIDI_CC_SOUND_CONTROLLER10:  // fill probability (0.0-1.0)
             params->fill.probability = value / 127.0f;
+            break;
+        case MIDI_CC_SOUND_CONTROLLER11:  // fill interval_bar (0, 2, 4, 8, 16)
+            params->fill.interval_bar = (value / 127.0f) * 16;
             break;
         default:
             break;
