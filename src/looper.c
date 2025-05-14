@@ -237,7 +237,9 @@ void looper_handle_button_event(button_event_t event) {
             if (looper_status.state != LOOPER_STATE_RECORDING) {
                 looper_status.recording_step_count = 0;
                 looper_status.state = LOOPER_STATE_RECORDING;
-                looper_clear_all_tracks();
+                memset(track->pattern, 0, LOOPER_TOTAL_STEPS);
+                memset(track->ghost_pattern, 0, LOOPER_TOTAL_STEPS);
+                memset(track->fill_pattern, 0, LOOPER_TOTAL_STEPS);
             }
             uint8_t quantized_step = looper_quantize_step();
             track->pattern[quantized_step] = true;
