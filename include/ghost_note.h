@@ -25,6 +25,7 @@ typedef struct {
 typedef struct {
     float ghost_intensity;
     float swing_ratio;
+    float swing_ratio_base;
     flams_parameters_t flams;
     euclidean_parameters_t euclidean;
     fill_parameters_t fill;
@@ -33,6 +34,8 @@ typedef struct {
 uint8_t *ghost_note_velocity_table(void);
 
 uint8_t ghost_note_modulate_base_velocity(uint8_t track_num, uint8_t default_velocity, float lfo);
+
+float ghost_note_modulate_swing_ratio(float lfo);
 
 void ghost_note_create(track_t *track);
 

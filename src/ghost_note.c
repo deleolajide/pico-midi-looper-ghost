@@ -13,6 +13,7 @@ static float note_density_track_window[4][LOOPER_TOTAL_STEPS];
 static ghost_parameters_t parameters = {
     .ghost_intensity = 1.0,
     .swing_ratio = 0.5,
+    .swing_ratio_base = 0.53,
     .flams = {.before_probability = 0.10, .after_probability = 0.50},
     .euclidean = {.k_max = 16, .k_sufficient = 6, .k_intensity = 0.60, .probability = 0.70},
     .fill = {.interval_bar = 4, .start_mean = 15.0, .start_sd = 5.0, .probability = 0.75},
@@ -34,18 +35,31 @@ uint8_t *ghost_note_velocity_table(void) { return velocity_table; }
 #define HH_FREQ_RATIO 2
 #define HH_VEL_BASE 107
 #define HH_VEL_DEPTH 20
+#define SWING_DEPTH 0.015f
 
 uint8_t ghost_note_modulate_base_velocity(uint8_t track_num, uint8_t default_velocity, float lfo) {
-    if (track_num == 0) { // Kick
-        float phase = (lfo / 65536.0f) * 2.0f * M_PI; /* 0-2π */
+    if (track_num == 0) {                                    // Kick
+        float phase = (lfo * 1.25 / 65536.0f) * 2.0f * M_PI; /* 0-2π */
         float kick_s = sinf(phase);
         return KICK_VEL_BASE + (int)(kick_s * KICK_VEL_DEPTH);
-    } else if (track_num == 2) { // Closed Hi-hat
+    } else if (track_num == 2) {                           // Closed Hi-hat
         uint16_t hh_phase = (uint32_t)lfo * HH_FREQ_RATIO; /* wrap */
         float hh_s = sinf((hh_phase / 65536.0f) * 2.0f * M_PI);
         return HH_VEL_BASE + (int)(hh_s * HH_VEL_DEPTH);
     }
     return default_velocity;
+}
+
+float ghost_note_modulate_swing_ratio(float lfo) {
+    float phase = ((uint32_t)lfo / 65536.0f) * 2.0f * M_PI;
+    phase += M_PI_2;
+    float swing =
+        parameters.swing_ratio_base + sinf(phase) * SWING_DEPTH * parameters.ghost_intensity;
+    if (swing < 0.50f)
+        swing = 0.50f;
+    if (swing > 0.75f)
+        swing = 0.75f;
+    return swing;
 }
 
 static double rand_standard_normal(void) {
@@ -217,17 +231,13 @@ void ghost_note_create(track_t *track) {
     add_flams_notes(track);
 }
 
-static inline bool is_first_step(looper_status_t *s) {
-    return s->current_step == 0;
-}
+static inline bool is_first_step(looper_status_t *s) { return s->current_step == 0; }
 
 static inline bool is_bar_start(looper_status_t *s) {
     return s->current_step % (LOOPER_BEATS_PER_BAR * LOOPER_STEPS_PER_BEAT) == 0;
 }
 
-static inline bool is_creation_bar(looper_status_t *s) {
-    return s->ghost_bar_counter == 0;
-}
+static inline bool is_creation_bar(looper_status_t *s) { return s->ghost_bar_counter == 0; }
 
 static inline bool is_fillin_bar(looper_status_t *s) {
     fill_parameters_t *fill = &parameters.fill;
@@ -253,4 +263,6 @@ void ghost_note_maintenance_step(void) {
         if (pattern_density() > 0)
             add_fillin_notes();
     }
+
+    parameters.swing_ratio = ghost_note_modulate_swing_ratio(looper_status->lfo_phase);
 }

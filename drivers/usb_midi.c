@@ -171,7 +171,7 @@ static void update_ghost_parameters(uint8_t channel, uint8_t cc, uint8_t value) 
         case MIDI_CC_EXPRESSION:
             params->ghost_intensity = value / 127.0f;
         case MIDI_CC_GENERAL_PURPOSE_CONTROLLER1:
-            params->swing_ratio = 0.5 + (value / 127.0) * 0.2;
+            params->swing_ratio_base = 0.5 + (value / 127.0) * 0.25;
         case MIDI_CC_SOUND_CONTROLLER2:  // euclidean k_max (1-16)
             params->euclidean.k_max = (uint8_t)clamp((int)value, 1, params->euclidean.k_max);
             break;
