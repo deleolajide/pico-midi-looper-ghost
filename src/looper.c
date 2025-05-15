@@ -118,9 +118,10 @@ static uint8_t looper_quantize_step() {
     uint8_t previous_step =
         (looper_status.current_step + LOOPER_TOTAL_STEPS - 1) % LOOPER_TOTAL_STEPS;
     if (previous_step % 2 == 0)
-        step_duration_ms = pair_length * setting->swing_ratio;
-    else
         step_duration_ms = pair_length * (1.0f - setting->swing_ratio);
+    else
+        step_duration_ms = pair_length * setting->swing_ratio;
+
     int64_t delta_us =
         looper_status.timing.button_press_start_us - looper_status.timing.last_step_time_us;
 
@@ -283,9 +284,9 @@ void looper_handle_tick(async_context_t *ctx, async_at_time_worker_t *worker) {
     float pair_length = looper_status.step_duration_ms * 2;
     float step_delay = looper_status.step_duration_ms;
     if (looper_status.current_step % 2 == 0)
-        step_delay = pair_length * setting->swing_ratio;
-    else
         step_delay = pair_length * (1.0f - setting->swing_ratio);
+    else
+        step_delay = pair_length * setting->swing_ratio;
 
     uint64_t handler_delay_ms = (time_us_64() - start_us) / 1000;
     uint32_t delay = (handler_delay_ms >= (uint32_t)step_delay)
