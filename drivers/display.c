@@ -46,14 +46,18 @@ static void print_track(const track_t *track,
         bool note_on = track->pattern[i];
         bool ghost_on = track->ghost_pattern[i];
         bool fill_on = track->fill_pattern[i];
-        if (current_step == i && (note_on || fill_on))
+        if (current_step == i && note_on)
             printf(ANSI_BG_WHITE ANSI_BLACK "*" ANSI_RESET ANSI_BOLD);
+        else if (current_step == i && fill_on)
+            printf(ANSI_BG_WHITE ANSI_BLACK "+" ANSI_RESET ANSI_BOLD);
         else if (current_step == i && ghost_on)
             printf(ANSI_BG_WHITE ANSI_BLACK "." ANSI_RESET ANSI_BOLD);
         else if (current_step == i && (!note_on && !fill_on))
-            printf(ANSI_BG_WHITE ANSI_BLACK " " ANSI_RESET ANSI_BOLD);
-        else if (note_on || fill_on)
+            printf(ANSI_BG_WHITE ANSI_BLACK "_" ANSI_RESET ANSI_BOLD);
+        else if (note_on)
             printf("*");
+        else if (fill_on)
+            printf("+");
         else if (ghost_on)
             printf(".");
         else

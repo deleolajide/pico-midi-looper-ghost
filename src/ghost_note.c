@@ -12,7 +12,8 @@ static float note_density_track_window[4][LOOPER_TOTAL_STEPS];
 
 static ghost_parameters_t parameters = {
     .ghost_intensity = 1.0,
-    .flams = {.before_probability = 0.50, .after_probability = 0.10},
+    .swing_ratio = 0.5,
+    .flams = {.before_probability = 0.10, .after_probability = 0.50},
     .euclidean = {.k_max = 16, .k_sufficient = 6, .k_intensity = 0.60, .probability = 0.70},
     .fill = {.interval_bar = 4, .start_mean = 15.0, .start_sd = 5.0, .probability = 0.75},
 };
@@ -145,14 +146,14 @@ static void add_flams_notes(track_t *track) {
     flams_parameters_t *flams = &parameters.flams;
 
     for (size_t i = 0; i < LOOPER_TOTAL_STEPS; i++) {
-        if (track->pattern[i] && !track->pattern[(i + 1) % LOOPER_TOTAL_STEPS] &&
-            !track->ghost_pattern[i])
-            track->ghost_pattern[(i + 1) % LOOPER_TOTAL_STEPS] =
-                PROBABILITY(flams->before_probability * parameters.ghost_intensity);
         if (track->pattern[i] &&
             !track->pattern[(LOOPER_TOTAL_STEPS + i - 1) % LOOPER_TOTAL_STEPS] &&
             !track->ghost_pattern[i])
             track->ghost_pattern[(LOOPER_TOTAL_STEPS + i - 1) % LOOPER_TOTAL_STEPS] =
+                PROBABILITY(flams->before_probability * parameters.ghost_intensity);
+        if (track->pattern[i] && !track->pattern[(i + 1) % LOOPER_TOTAL_STEPS] &&
+            !track->ghost_pattern[i])
+            track->ghost_pattern[(i + 1) % LOOPER_TOTAL_STEPS] =
                 PROBABILITY(flams->after_probability * parameters.ghost_intensity);
     }
 }

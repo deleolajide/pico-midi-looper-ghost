@@ -270,11 +270,18 @@ void looper_handle_tick(async_context_t *ctx, async_at_time_worker_t *worker) {
 
     looper_process_state(start_us);
 
-    // Re-arms the timer to fire again after `step_duration_ms`, adjusting for processing time.
+    ghost_parameters_t *setting = ghost_note_parameters();
+    float step_delay = looper_status.step_duration_ms;
+    if ((looper_status.current_step % 2) == 0) {
+        step_delay = looper_status.step_duration_ms * 2 * setting->swing_ratio;
+    } else {
+        step_delay = looper_status.step_duration_ms * 2 * (1.0f - setting->swing_ratio);
+    }
     uint64_t handler_delay_ms = (time_us_64() - start_us) / 1000;
-    uint32_t delay = (handler_delay_ms >= looper_status.step_duration_ms)
+    uint32_t delay = (handler_delay_ms >= (uint32_t)step_delay)
                          ? 1
-                         : looper_status.step_duration_ms - handler_delay_ms;
+                         : (uint32_t)step_delay - handler_delay_ms;
+
     async_context_add_at_time_worker_in_ms(ctx, worker, delay);
 }
 

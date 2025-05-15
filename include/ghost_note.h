@@ -24,6 +24,7 @@ typedef struct {
 
 typedef struct {
     float ghost_intensity;
+    float swing_ratio;
     flams_parameters_t flams;
     euclidean_parameters_t euclidean;
     fill_parameters_t fill;
