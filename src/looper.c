@@ -271,12 +271,13 @@ void looper_handle_tick(async_context_t *ctx, async_at_time_worker_t *worker) {
     looper_process_state(start_us);
 
     ghost_parameters_t *setting = ghost_note_parameters();
+    float pair_length = looper_status.step_duration_ms * 2;
     float step_delay = looper_status.step_duration_ms;
-    if ((looper_status.current_step % 2) == 0) {
-        step_delay = looper_status.step_duration_ms * 2 * setting->swing_ratio;
-    } else {
-        step_delay = looper_status.step_duration_ms * 2 * (1.0f - setting->swing_ratio);
-    }
+    if (looper_status.current_step % 2 == 0)
+        step_delay = pair_length * setting->swing_ratio;
+    else
+        step_delay = pair_length * (1.0f - setting->swing_ratio);
+
     uint64_t handler_delay_ms = (time_us_64() - start_us) / 1000;
     uint32_t delay = (handler_delay_ms >= (uint32_t)step_delay)
                          ? 1
