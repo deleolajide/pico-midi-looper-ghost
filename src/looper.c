@@ -10,6 +10,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "drivers/async_timer.h"
@@ -111,13 +112,21 @@ static void looper_next_step(uint64_t now_us) {
  * The result is quantized to the nearest step relative to the last tick.
  */
 static uint8_t looper_quantize_step() {
-    int64_t delta_us =
-        looper_status.timing.button_press_start_us - looper_status.timing.last_step_time_us;
-    // Convert to step offset using rounding (nearest step)
-    int32_t relative_steps =
-        (int32_t)round((double)delta_us / 1000.0 / looper_status.step_duration_ms);
+    ghost_parameters_t *setting = ghost_note_parameters();
+    float pair_length = looper_status.step_duration_ms * 2;
+    float step_duration_ms = looper_status.step_duration_ms;
     uint8_t previous_step =
         (looper_status.current_step + LOOPER_TOTAL_STEPS - 1) % LOOPER_TOTAL_STEPS;
+    if (previous_step % 2 == 0)
+        step_duration_ms = pair_length * setting->swing_ratio;
+    else
+        step_duration_ms = pair_length * (1.0f - setting->swing_ratio);
+    int64_t delta_us =
+        looper_status.timing.button_press_start_us - looper_status.timing.last_step_time_us;
+
+    // Convert to step offset using rounding (nearest step)
+    int32_t relative_steps =
+        (int32_t)round((double)delta_us / 1000.0 / step_duration_ms);
     uint8_t estimated_step =
         (previous_step + relative_steps + LOOPER_TOTAL_STEPS) % LOOPER_TOTAL_STEPS;
     return estimated_step;
