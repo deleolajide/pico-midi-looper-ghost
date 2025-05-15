@@ -53,8 +53,9 @@ uint8_t ghost_note_modulate_base_velocity(uint8_t track_num, uint8_t default_vel
 float ghost_note_modulate_swing_ratio(float lfo) {
     float phase = ((uint32_t)lfo / 65536.0f) * 2.0f * M_PI;
     phase += M_PI_2;
+    float swing_lfo = parameters.swing_ratio_base + sinf(phase) * SWING_DEPTH;
     float swing =
-        parameters.swing_ratio_base + sinf(phase) * SWING_DEPTH * parameters.ghost_intensity;
+        (1.0f - parameters.ghost_intensity) * 0.50f + parameters.ghost_intensity * swing_lfo;
     if (swing < 0.50f)
         swing = 0.50f;
     if (swing > 0.75f)
