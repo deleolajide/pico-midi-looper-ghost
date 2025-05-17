@@ -45,6 +45,11 @@ typedef struct {
     uint16_t lfo_phase;
 } looper_status_t;
 
+typedef struct {
+    uint8_t probability;
+    uint8_t rand_sample;
+} ghost_note_t;
+
 // Represents each MIDI track with note and sequence pattern.
 typedef struct {
     const char *name;                       // Human-readable name of the track.
@@ -52,7 +57,7 @@ typedef struct {
     uint8_t channel;                        // MIDI channel.
     bool pattern[LOOPER_TOTAL_STEPS];       // Current active pattern
     bool hold_pattern[LOOPER_TOTAL_STEPS];  // Temporary copy saved on button down.
-    bool ghost_pattern[LOOPER_TOTAL_STEPS];
+    ghost_note_t ghost_notes[LOOPER_TOTAL_STEPS];
     bool fill_pattern[LOOPER_TOTAL_STEPS];
 } track_t;
 
