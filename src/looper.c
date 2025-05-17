@@ -9,6 +9,8 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
+#include "looper.h"
+
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,7 +21,6 @@
 #include "drivers/display.h"
 #include "drivers/led.h"
 #include "drivers/usb_midi.h"
-#include "looper.h"
 #include "ghost_note.h"
 #include "tap_tempo.h"
 
@@ -70,6 +71,8 @@ static void send_click_if_needed(void) {
 // Perform all note events for the current step across all tracks.
 // If the current track is active, also update the status LED.
 static void looper_perform_step(void) {
+    ghost_parameters_t *params = ghost_note_parameters();
+
     for (uint8_t i = 0; i < NUM_TRACKS; i++) {
         bool note_on = tracks[i].pattern[looper_status.current_step];
         if (note_on) {
@@ -80,10 +83,13 @@ static void looper_perform_step(void) {
         } else if (i == looper_status.current_track) {
             led_set(0);
         }
-
         uint8_t *ghost_note_velocity = ghost_note_velocity_table();
-        if (tracks[i].ghost_pattern[looper_status.current_step] &&
-            !tracks[i].fill_pattern[looper_status.current_step])
+        bool ghost_note_on =
+            ((float)tracks[i].ghost_notes[looper_status.current_step].probability / 100.0f) *
+                params->ghost_intensity >
+            (float)tracks[i].ghost_notes[looper_status.current_step].rand_sample / 100.0f;
+
+        if (ghost_note_on && !tracks[i].fill_pattern[looper_status.current_step])
             looper_perform_note(tracks[i].channel, tracks[i].note, ghost_note_velocity[i]);
         if (tracks[i].fill_pattern[looper_status.current_step] && !note_on)
             looper_perform_note(tracks[i].channel, tracks[i].note, 0x7f);
@@ -126,8 +132,7 @@ static uint8_t looper_quantize_step() {
         looper_status.timing.button_press_start_us - looper_status.timing.last_step_time_us;
 
     // Convert to step offset using rounding (nearest step)
-    int32_t relative_steps =
-        (int32_t)round((double)delta_us / 1000.0 / step_duration_ms);
+    int32_t relative_steps = (int32_t)round((double)delta_us / 1000.0 / step_duration_ms);
     uint8_t estimated_step =
         (previous_step + relative_steps + LOOPER_TOTAL_STEPS) % LOOPER_TOTAL_STEPS;
     return estimated_step;
@@ -137,7 +142,7 @@ static uint8_t looper_quantize_step() {
 static void looper_clear_all_tracks() {
     for (size_t i = 0; i < NUM_TRACKS; i++) {
         memset(tracks[i].pattern, 0, sizeof(tracks[i].pattern));
-        memset(tracks[i].ghost_pattern, 0, sizeof(tracks[i].ghost_pattern));
+        memset(tracks[i].ghost_notes, 0, sizeof(tracks[i].ghost_notes));
         memset(tracks[i].fill_pattern, 0, sizeof(tracks[i].fill_pattern));
     }
 }
@@ -248,7 +253,7 @@ void looper_handle_button_event(button_event_t event) {
                 looper_status.recording_step_count = 0;
                 looper_status.state = LOOPER_STATE_RECORDING;
                 memset(track->pattern, 0, LOOPER_TOTAL_STEPS);
-                memset(track->ghost_pattern, 0, LOOPER_TOTAL_STEPS);
+                memset(track->ghost_notes, 0, sizeof(track->ghost_notes));
                 memset(track->fill_pattern, 0, LOOPER_TOTAL_STEPS);
             }
             uint8_t quantized_step = looper_quantize_step();
@@ -289,9 +294,8 @@ void looper_handle_tick(async_context_t *ctx, async_at_time_worker_t *worker) {
         step_delay = pair_length * setting->swing_ratio;
 
     uint64_t handler_delay_ms = (time_us_64() - start_us) / 1000;
-    uint32_t delay = (handler_delay_ms >= (uint32_t)step_delay)
-                         ? 1
-                         : (uint32_t)step_delay - handler_delay_ms;
+    uint32_t delay =
+        (handler_delay_ms >= (uint32_t)step_delay) ? 1 : (uint32_t)step_delay - handler_delay_ms;
 
     async_context_add_at_time_worker_in_ms(ctx, worker, delay);
 }

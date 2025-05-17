@@ -15,8 +15,8 @@ static ghost_parameters_t parameters = {
     .swing_ratio = 0.5,
     .swing_ratio_base = 0.53,
     .flams = {.before_probability = 0.10, .after_probability = 0.50},
-    .euclidean = {.k_max = 16, .k_sufficient = 6, .k_intensity = 0.60, .probability = 0.70},
-    .fill = {.interval_bar = 4, .start_mean = 15.0, .start_sd = 5.0, .probability = 0.75},
+    .euclidean = {.k_max = 16, .k_sufficient = 6, .k_intensity = 0.90, .probability = 0.80},
+    .fill = {.interval_bar = 4, .start_mean = 15.0, .start_sd = 5.0, .probability = 0.40},
 };
 
 ghost_parameters_t *ghost_note_parameters(void) { return &parameters; }
@@ -130,10 +130,11 @@ static void apply_euclidean_ghost_notes(track_t *track, uint8_t total_notes, uin
             euclid_accumulator -= LOOPER_TOTAL_STEPS;
             size_t pos = (i + offset) % LOOPER_TOTAL_STEPS;
 
-            if (!track->pattern[pos] && !track->ghost_pattern[pos]) {
-                float probability =
-                    euclid->probability * (1.0f - density) * parameters.ghost_intensity;
-                track->ghost_pattern[pos] = PROBABILITY(probability);
+            if (!track->pattern[pos] && track->ghost_notes[pos].rand_sample == 0) {
+                float probability = euclid->probability * (1.0f - density);
+                uint8_t prob = (uint8_t)roundf(clamp_int(probability * 100.0f, 0, 100));
+                track->ghost_notes[pos].probability = prob;
+                track->ghost_notes[pos].rand_sample = rand() % 100;
             }
         }
     }
@@ -163,13 +164,18 @@ static void add_flams_notes(track_t *track) {
     for (size_t i = 0; i < LOOPER_TOTAL_STEPS; i++) {
         if (track->pattern[i] &&
             !track->pattern[(LOOPER_TOTAL_STEPS + i - 1) % LOOPER_TOTAL_STEPS] &&
-            !track->ghost_pattern[i])
-            track->ghost_pattern[(LOOPER_TOTAL_STEPS + i - 1) % LOOPER_TOTAL_STEPS] =
-                PROBABILITY(flams->before_probability * parameters.ghost_intensity);
+            !track->ghost_notes[i].rand_sample) {
+            track->ghost_notes[(LOOPER_TOTAL_STEPS + i - 1) % LOOPER_TOTAL_STEPS].probability =
+                (uint8_t)(flams->before_probability * 100);
+            track->ghost_notes[(LOOPER_TOTAL_STEPS + i - 1) % LOOPER_TOTAL_STEPS].rand_sample =
+                rand() % 100;
+        }
         if (track->pattern[i] && !track->pattern[(i + 1) % LOOPER_TOTAL_STEPS] &&
-            !track->ghost_pattern[i])
-            track->ghost_pattern[(i + 1) % LOOPER_TOTAL_STEPS] =
-                PROBABILITY(flams->after_probability * parameters.ghost_intensity);
+            !track->ghost_notes[i].rand_sample) {
+            track->ghost_notes[(i + 1) % LOOPER_TOTAL_STEPS].probability =
+                (uint8_t)(flams->after_probability * 100);
+            track->ghost_notes[(i + 1) % LOOPER_TOTAL_STEPS].rand_sample = rand() % 100;
+        }
     }
 }
 
@@ -187,7 +193,7 @@ static void update_density_track_window(void) {
     track_t *tracks = looper_tracks_get(&num_tracks);
     for (size_t t = 0; t < num_tracks; t++) {
         for (size_t i = 0; i < LOOPER_TOTAL_STEPS; i++) {
-            note_density_track_window[t][i] = track_window_density(&tracks[t], i, 6);
+            note_density_track_window[t][i] = track_window_density(&tracks[t], i, 8);
         }
     }
 }
@@ -202,12 +208,21 @@ static void add_fillin_notes(void) {
 
     uint16_t fill_start = LOOPER_TOTAL_STEPS - abs(rand_normal(fill->start_mean, fill->start_sd));
     for (size_t t = 0; t < num_tracks; t++) {
+        if (t != 0 && t != 1)
+            continue;
+
         for (size_t i = fill_start; i < LOOPER_TOTAL_STEPS; i++) {
-            if ((t == 0 || t == 1) && !tracks[t].ghost_pattern[i]) {
-                tracks[t].ghost_pattern[i] = PROBABILITY((1 - note_density_track_window[t][i]) *
-                                                         0.25 * parameters.ghost_intensity);
+            bool ghost_on = (float)(tracks[t].ghost_notes[i].probability / 100.0f) *
+                                parameters.ghost_intensity >
+                            (float)tracks[t].ghost_notes[i].rand_sample / 100.0f;
+            if (!ghost_on) {
+                tracks[t].ghost_notes[i].probability =
+                    (uint8_t)((1.0 - note_density_track_window[t][i]) * 0.25 * 100.0f);
+                tracks[t].ghost_notes[i].rand_sample = rand() % 100;
             }
-            if (tracks[t].ghost_pattern[i])
+            if (((float)tracks[t].ghost_notes[i].probability / 100.0f) *
+                    parameters.ghost_intensity >
+                (float)(tracks[t].ghost_notes[i].rand_sample / 100))
                 tracks[t].fill_pattern[i] =
                     PROBABILITY(fill->probability * parameters.ghost_intensity);
         }
@@ -226,7 +241,7 @@ static float pattern_density(void) {
 }
 
 void ghost_note_create(track_t *track) {
-    memset(track->ghost_pattern, 0, LOOPER_TOTAL_STEPS);
+    memset(track->ghost_notes, 0, sizeof(track->ghost_notes));
 
     add_euclidean_ghost_notes(track);
     add_flams_notes(track);

@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+#include "ghost_note.h"
 #include "looper.h"
 
 #define ANSI_BLACK "\x1b[30m"
@@ -35,16 +36,18 @@
 #define ANSI_DISABLE_ALTSCREEN "\x1b[?1049l"
 
 // Prints a single track row with step highlighting and note indicators.
-static void print_track(const track_t *track,
-                        uint8_t current_step, bool is_selected) {
+static void print_track(const track_t *track, uint8_t current_step, bool is_selected) {
     if (is_selected)
         printf("  " ANSI_BOLD ">%-11s [", track->name);
     else
         printf("  " ANSI_BRIGHT_BLACK " %-11s " ANSI_RESET ANSI_BOLD "[", track->name);
 
+    ghost_parameters_t *params = ghost_note_parameters();
     for (int i = 0; i < LOOPER_TOTAL_STEPS; ++i) {
         bool note_on = track->pattern[i];
-        bool ghost_on = track->ghost_pattern[i];
+        bool ghost_on =
+            ((float)track->ghost_notes[i].probability / 100.0f) * params->ghost_intensity >
+            (float)track->ghost_notes[i].rand_sample / 100.0f;
         bool fill_on = track->fill_pattern[i];
         if (current_step == i && note_on)
             printf(ANSI_BG_WHITE ANSI_BLACK "*" ANSI_RESET ANSI_BOLD);
@@ -109,8 +112,7 @@ void display_update_looper_status(bool output_connected, const looper_status_t *
 
     // Display tracks in order from cymbals to basses, like a typical drum machine.
     for (int8_t i = num_tracks - 1; i >= 0; i--)
-        print_track(&tracks[i],
-                    looper->current_step, i == looper->current_track);
+        print_track(&tracks[i], looper->current_step, i == looper->current_track);
 
     fflush(stdout);
 }
