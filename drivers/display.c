@@ -74,7 +74,7 @@ void display_update_looper_status(bool output_connected, const looper_status_t *
                                   const track_t *tracks, size_t num_tracks) {
     printf(ANSI_ENABLE_ALTSCREEN);
 
-    if (looper->current_step % 32 == 0)
+    if (looper->current_step % LOOPER_TOTAL_STEPS == 0)
         printf(ANSI_CLEAR_HOME);
     printf(ANSI_HIDE_CURSOR);
     printf(ANSI_CURSOR_FMT ANSI_CLEAR_EOL, 1, 1);
