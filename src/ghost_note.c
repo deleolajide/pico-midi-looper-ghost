@@ -11,9 +11,9 @@
 static float note_density_track_window[4][LOOPER_TOTAL_STEPS];
 
 static ghost_parameters_t parameters = {
-    .ghost_intensity = 1.0,
+    .ghost_intensity = 0.843,
     .swing_ratio = 0.5,
-    .swing_ratio_base = 0.53,
+    .swing_ratio_base = 0.660,
     .flams = {.before_probability = 0.10, .after_probability = 0.50},
     .euclidean = {.k_max = 16, .k_sufficient = 6, .k_intensity = 0.90, .probability = 0.80},
     .fill = {.interval_bar = 4, .start_mean = 15.0, .start_sd = 5.0, .probability = 0.40},
@@ -50,12 +50,26 @@ uint8_t ghost_note_modulate_base_velocity(uint8_t track_num, uint8_t default_vel
     return default_velocity;
 }
 
+static inline float swing_mod(float intensity) {
+    if (intensity <= 0.50f)
+        return 0.0f;
+
+    const float k = 40.0f;
+    const float x0 = 0.90f;
+    float sig = 1.0f / (1.0f + expf(-k * (intensity - x0)));
+    // normalize
+    const float sig_lo = 1.0f / (1.0f + expf(-k * (0.51f - x0)));
+    const float sig_hi = 1.0f / (1.0f + expf(-k * (1.0f - x0)));
+    return (sig - sig_lo) / (sig_hi - sig_lo);
+}
+
 float ghost_note_modulate_swing_ratio(float lfo) {
+    float swing_intensity = swing_mod(parameters.ghost_intensity);
     float phase = ((uint32_t)lfo / 65536.0f) * 2.0f * M_PI;
     phase += M_PI_2;
     float swing_lfo = parameters.swing_ratio_base + sinf(phase) * SWING_DEPTH;
     float swing =
-        (1.0f - parameters.ghost_intensity) * 0.50f + parameters.ghost_intensity * swing_lfo;
+        (1.0f - swing_intensity) * 0.50f + swing_intensity * swing_lfo;
     if (swing < 0.50f)
         swing = 0.50f;
     if (swing > 0.75f)
