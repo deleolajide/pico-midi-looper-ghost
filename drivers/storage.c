@@ -48,7 +48,13 @@ bool storage_load_tracks(void) {
     return true;
 }
 
-bool storage_store_tracks() {
+bool storage_erase_tracks(void) {
+    mutation_operation_t erase = {.op_is_erase = true, .p0 = GHOST_FLASH_BANK_STORAGE_OFFSET};
+    flash_safe_execute(flash_bank_perform_operation, &erase, UINT32_MAX);
+    return true;
+}
+
+bool storage_store_tracks(void) {
     uint8_t storage[FLASH_PAGE_SIZE];
     storage_pattern_t *data = (storage_pattern_t *)&storage;
     size_t num_tracks;
@@ -56,13 +62,8 @@ bool storage_store_tracks() {
 
     memcpy(&data->magic, MAGIC_HEADER, sizeof(data->magic));
     for (size_t t = 0; t < NUM_TRACKS; t++) {
-        for (size_t i = 0; i < LOOPER_TOTAL_STEPS; i++) {
-            data->pattern[t][i] = tracks[t].pattern[i];
-        }
+        memcpy(data->pattern[t], tracks[t].pattern, sizeof(tracks[t].pattern));
     }
-
-    mutation_operation_t erase = {.op_is_erase = true, .p0 = GHOST_FLASH_BANK_STORAGE_OFFSET};
-    flash_safe_execute(flash_bank_perform_operation, &erase, UINT32_MAX);
     mutation_operation_t program = {
         .op_is_erase = false, .p0 = GHOST_FLASH_BANK_STORAGE_OFFSET, .p1 = (uintptr_t)storage};
     flash_safe_execute(flash_bank_perform_operation, &program, UINT32_MAX);

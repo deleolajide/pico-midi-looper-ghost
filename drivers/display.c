@@ -114,5 +114,6 @@ void display_update_looper_status(bool output_connected, const looper_status_t *
     for (int8_t i = num_tracks - 1; i >= 0; i--)
         print_track(&tracks[i], looper->current_step, i == looper->current_track);
 
+    printf("Swing: %.3f\n", ghost_note_parameters()->swing_ratio);
     fflush(stdout);
 }

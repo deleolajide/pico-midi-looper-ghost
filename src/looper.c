@@ -46,9 +46,11 @@ static track_t tracks[] = {
     {"Bass", BASS_DRUM, MIDI_CHANNEL10, {0}, {0}},
     {"Snare", SNARE_DRUM, MIDI_CHANNEL10, {0}, {0}},
     {"Hi-hat", CLOSED_HIHAT, MIDI_CHANNEL10, {0}, {0}},
-    {"Open Hi-hat", OPEN_HIHAT, MIDI_CHANNEL10, {0}, {0}},
+    {"Hand clap", HAND_CLAP, MIDI_CHANNEL10, {0}, {0}},
 };
 static const size_t NUM_TRACKS = sizeof(tracks) / sizeof(track_t);
+
+static bool to_be_saved = false;
 
 // Check if the note output destination is ready.
 static bool looper_perform_ready(void) {
@@ -182,6 +184,7 @@ void looper_update_bpm(uint32_t bpm) {
     looper_status.step_duration_ms = 60000 / (bpm * LOOPER_STEPS_PER_BEAT);
 }
 
+static bool need_save = false;
 // Processes the looper's main state machine, called by the step timer.
 void looper_process_state(uint64_t start_us) {
     bool ready = looper_perform_ready();
@@ -206,16 +209,16 @@ void looper_process_state(uint64_t start_us) {
             send_click_if_needed();
             looper_perform_step_recording();
             if (looper_status.recording_step_count >= LOOPER_TOTAL_STEPS) {
-                storage_store_tracks();
                 led_set(0);
                 looper_status.state = LOOPER_STATE_PLAYING;
+                storage_store_tracks();
             }
             looper_next_step(start_us);
             looper_status.recording_step_count++;
             break;
         case LOOPER_STATE_TRACK_SWITCH:
             looper_status.current_track = (looper_status.current_track + 1) % NUM_TRACKS;
-            looper_perform_note(MIDI_CHANNEL10, HAND_CLAP, 0x7f);
+            looper_perform_note(MIDI_CHANNEL10, OPEN_HIHAT, 0x7f);
             looper_next_step(start_us);
             looper_status.state = LOOPER_STATE_PLAYING;
             break;
@@ -258,6 +261,7 @@ void looper_handle_button_event(button_event_t event) {
                 memset(track->pattern, 0, LOOPER_TOTAL_STEPS);
                 memset(track->ghost_notes, 0, sizeof(track->ghost_notes));
                 memset(track->fill_pattern, 0, LOOPER_TOTAL_STEPS);
+                storage_erase_tracks();
             }
             uint8_t quantized_step = looper_quantize_step();
             track->pattern[quantized_step] = true;
@@ -270,12 +274,12 @@ void looper_handle_button_event(button_event_t event) {
         case BUTTON_EVENT_LONG_HOLD_RELEASE:
             // ≥2 s hold: enter Tap-tempo (no track switch)
             looper_status.state = LOOPER_STATE_TAP_TEMPO;
-            looper_perform_note(MIDI_CHANNEL10, HAND_CLAP, 0x7f);
+            looper_perform_note(MIDI_CHANNEL10, OPEN_HIHAT, 0x7f);
             break;
         case BUTTON_EVENT_VERY_LONG_HOLD_RELEASE:
             // ≥5 s hold: clear track data
             looper_status.state = LOOPER_STATE_CLEAR_TRACKS;
-            looper_perform_note(MIDI_CHANNEL10, HAND_CLAP, 0x7f);
+            looper_perform_note(MIDI_CHANNEL10, CYMBAL, 0x7f);
             break;
         default:
             break;
