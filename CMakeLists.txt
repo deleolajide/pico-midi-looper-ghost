@@ -26,6 +26,7 @@ add_library(drivers
   drivers/display.c
   drivers/led.c
   drivers/async_timer.c
+  drivers/storage.c
 )
 target_include_directories(drivers PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include)
 target_link_libraries(drivers

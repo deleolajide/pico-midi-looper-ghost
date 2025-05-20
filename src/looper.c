@@ -21,6 +21,7 @@
 #include "drivers/display.h"
 #include "drivers/led.h"
 #include "drivers/usb_midi.h"
+#include "drivers/storage.h"
 #include "ghost_note.h"
 #include "tap_tempo.h"
 
@@ -145,6 +146,7 @@ static void looper_clear_all_tracks() {
         memset(tracks[i].ghost_notes, 0, sizeof(tracks[i].ghost_notes));
         memset(tracks[i].fill_pattern, 0, sizeof(tracks[i].fill_pattern));
     }
+    storage_store_tracks();
 }
 
 // Routes button events related to tap-tempo mode.
@@ -204,6 +206,7 @@ void looper_process_state(uint64_t start_us) {
             send_click_if_needed();
             looper_perform_step_recording();
             if (looper_status.recording_step_count >= LOOPER_TOTAL_STEPS) {
+                storage_store_tracks();
                 led_set(0);
                 looper_status.state = LOOPER_STATE_PLAYING;
             }

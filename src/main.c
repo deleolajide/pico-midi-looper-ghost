@@ -14,6 +14,7 @@
 #include "drivers/ble_midi.h"
 #include "drivers/usb_midi.h"
 #include "drivers/async_timer.h"
+#include "drivers/storage.h"
 
 /*
  * Entry point for the Pico MIDI Looper application.
@@ -28,6 +29,8 @@ int main(void) {
 
     usb_midi_init();
     ble_midi_init();
+
+    storage_load_tracks();
 
     // Async timer + sequencer tick setup
     async_timer_init();
