@@ -33,7 +33,9 @@ A ghost lives within the device.
 ## Demo
 
 Watch it in action:
-[YouTube –  "Ghost" Edition Demo](https://www.youtube.com/shorts/HNQDrlHFJ74)
+
+[YouTube –  "Ghost" Edition Demo1](https://www.youtube.com/shorts/-Et41TXjqLs)
+[Demo2](https://www.youtube.com/shorts/ndGxzRGGCx0)
 
 ## Getting Started
 
