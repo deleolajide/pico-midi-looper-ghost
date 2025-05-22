@@ -50,7 +50,8 @@ static track_t tracks[] = {
 };
 static const size_t NUM_TRACKS = sizeof(tracks) / sizeof(track_t);
 
-static bool to_be_saved = false;
+static uint32_t midi_sync_tick = 0;
+static uint64_t midi_sync_tick_latest_us = 0;
 
 // Check if the note output destination is ready.
 static bool looper_perform_ready(void) {
@@ -184,7 +185,6 @@ void looper_update_bpm(uint32_t bpm) {
     looper_status.step_duration_ms = 60000 / (bpm * LOOPER_STEPS_PER_BEAT);
 }
 
-static bool need_save = false;
 // Processes the looper's main state machine, called by the step timer.
 void looper_process_state(uint64_t start_us) {
     bool ready = looper_perform_ready();
@@ -233,6 +233,16 @@ void looper_process_state(uint64_t start_us) {
             looper_update_bpm(LOOPER_DEFAULT_BPM);
             looper_next_step(start_us);
             looper_status.state = LOOPER_STATE_PLAYING;
+            break;
+        case LOOPER_STATE_SYNC_PLAYING:
+            looper_perform_step();
+            led_set(1);
+            looper_next_step(start_us);
+            break;
+        case LOOPER_STATE_SYNC_MUTE:
+            led_set(0);
+            looper_next_step(start_us);
+            break;
         default:
             break;
     }
@@ -307,12 +317,69 @@ void looper_handle_tick(async_context_t *ctx, async_at_time_worker_t *worker) {
     async_context_add_at_time_worker_in_ms(ctx, worker, delay);
 }
 
+static void looper_audit_midi_sync(async_context_t *ctx, async_at_time_worker_t *worker) {
+    uint64_t now_us = time_us_64();
+
+    if (looper_status.state == LOOPER_STATE_SYNC_PLAYING || looper_status.state == LOOPER_STATE_SYNC_MUTE) {
+        if (now_us - midi_sync_tick_latest_us > 250000) {
+            looper_status.state = LOOPER_STATE_WAITING;
+            async_context_add_at_time_worker_in_ms(ctx, &looper_status.tick_timer, looper_get_step_interval_ms());
+        }
+    }
+    async_context_add_at_time_worker_in_ms(ctx, worker, 1000);
+}
+
+void looper_handle_midi_tick(void) {
+    uint64_t start_us = time_us_64();
+    midi_sync_tick++;
+    static uint64_t delta6 = 0;
+
+    if (looper_status.state != LOOPER_STATE_SYNC_PLAYING && looper_status.state != LOOPER_STATE_SYNC_MUTE) {
+        async_context_t *ctx = async_timer_async_context();
+        async_context_remove_at_time_worker(ctx, &looper_status.tick_timer);
+
+        if (looper_status.state == LOOPER_STATE_TAP_TEMPO)
+            looper_status.state = LOOPER_STATE_SYNC_MUTE;
+        else
+            looper_status.state = LOOPER_STATE_SYNC_PLAYING;
+    }
+
+    uint64_t delta_us = start_us - midi_sync_tick_latest_us;
+    delta6 += delta_us;
+
+    if (midi_sync_tick % 6 == 0) {
+        looper_process_state(start_us);
+
+        float bpm = 60000000.0f / ((delta6 / 6) * 24.0f);
+        looper_update_bpm(bpm);
+        delta6 = 0;
+    }
+
+    midi_sync_tick_latest_us = start_us;
+}
+
+void looper_handle_midi_start(void) {
+    looper_status.current_step = 0;
+    looper_status.ghost_bar_counter = 0;
+    looper_status.lfo_phase = 0;
+}
+
 // Poll button events, process them, and update the status LED.
 void looper_handle_input(void) {
     button_event_t event = button_poll_event();
     if (looper_status.state == LOOPER_STATE_TAP_TEMPO) {
         if (taptempo_handle_button_event(event) == TAP_EXIT)
             looper_status.state = LOOPER_STATE_PLAYING;
+    } else if (looper_status.state == LOOPER_STATE_SYNC_PLAYING || looper_status.state == LOOPER_STATE_SYNC_MUTE) {
+        if (event == BUTTON_EVENT_CLICK_RELEASE ||
+            event == BUTTON_EVENT_HOLD_RELEASE ||
+            event == BUTTON_EVENT_LONG_HOLD_RELEASE ||
+            event == BUTTON_EVENT_VERY_LONG_HOLD_RELEASE) {
+            if (looper_status.state == LOOPER_STATE_SYNC_PLAYING)
+                looper_status.state = LOOPER_STATE_SYNC_MUTE;
+            else
+                looper_status.state = LOOPER_STATE_SYNC_PLAYING;
+        }
     } else {
         looper_handle_button_event(event);
     }
@@ -322,8 +389,10 @@ void looper_handle_input(void) {
 void looper_schedule_step_timer(void) {
     looper_update_bpm(LOOPER_DEFAULT_BPM);
 
-    static async_at_time_worker_t worker;
-    worker.do_work = looper_handle_tick;
+    looper_status.tick_timer.do_work = looper_handle_tick;
     async_context_t *ctx = async_timer_async_context();
-    async_context_add_at_time_worker_in_ms(ctx, &worker, looper_get_step_interval_ms());
+    async_context_add_at_time_worker_in_ms(ctx, &looper_status.tick_timer, looper_get_step_interval_ms());
+
+    looper_status.sync_timer.do_work = looper_audit_midi_sync;
+    async_context_add_at_time_worker_in_ms(ctx, &looper_status.sync_timer, 1000);
 }

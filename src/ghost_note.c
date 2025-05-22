@@ -211,7 +211,7 @@ static void add_fillin_notes(void) {
 
     update_density_track_window();
 
-    uint16_t fill_start = LOOPER_TOTAL_STEPS - abs(rand_normal(fill->start_mean, fill->start_sd));
+    uint16_t fill_start = LOOPER_TOTAL_STEPS - abs((int8_t)rand_normal(fill->start_mean, fill->start_sd));
     for (size_t t = 0; t < num_tracks; t++) {
         if (t != 0 && t != 1)
             continue;

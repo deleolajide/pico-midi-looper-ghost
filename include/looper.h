@@ -22,6 +22,8 @@ typedef enum {
     LOOPER_STATE_TRACK_SWITCH,  // Switching to next track.
     LOOPER_STATE_TAP_TEMPO,
     LOOPER_STATE_CLEAR_TRACKS,
+    LOOPER_STATE_SYNC_MUTE,          // MIDI Clock slave: synced, muted (waiting to play)
+    LOOPER_STATE_SYNC_PLAYING        // MIDI Clock slave: synced, playing (sound on)
 } looper_state_t;
 
 typedef struct {
@@ -43,6 +45,8 @@ typedef struct {
     looper_timing_t timing;
     uint8_t ghost_bar_counter;
     uint16_t lfo_phase;
+    async_at_time_worker_t tick_timer;
+    async_at_time_worker_t sync_timer;
 } looper_status_t;
 
 typedef struct {
@@ -77,6 +81,9 @@ void looper_process_state(uint64_t start_us);
 void looper_handle_button_event(button_event_t event);
 
 void looper_handle_tick(async_context_t *ctx, async_at_time_worker_t *worker);
+
+void looper_handle_midi_tick(void);
+void looper_handle_midi_start(void);
 
 void looper_handle_input(void);
 

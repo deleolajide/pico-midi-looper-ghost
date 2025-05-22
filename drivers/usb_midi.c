@@ -2,6 +2,7 @@
 #include "pico/bootrom.h"
 #include "tusb.h"
 #include "ghost_note.h"
+#include "looper.h"
 
 #define _PID_MAP(itf, n) ((CFG_TUD_##itf) << (n))
 #define USB_PID                                                                            \
@@ -112,6 +113,7 @@ uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
 }
 
 void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const *p_line_coding) {
+    (void)itf;
     if (p_line_coding->bit_rate == 1200) {
         reset_usb_boot(0, 0);
     }
@@ -209,12 +211,16 @@ void usb_midi_task(void) {
     tud_task();
 
     while (tud_midi_available()) {
-        uint8_t packet[4];
+        uint8_t packet[4] = {0};
         tud_midi_packet_read(packet);
         uint8_t status = packet[1];
         uint8_t channel = status & 0x0F;
         uint8_t message = status & 0xF0;
-        if (message == 0xB0)
+        if (packet[0] == 0x0F && status == 0xF8)
+            looper_handle_midi_tick();
+        else if (packet[0] == 0x0F && status == 0xFA)
+            looper_handle_midi_start();
+        else if (message == 0xB0)
             update_ghost_parameters(channel, packet[2], packet[3]);
     }
 }
