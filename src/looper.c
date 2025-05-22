@@ -362,6 +362,7 @@ void looper_handle_midi_start(void) {
     looper_status.current_step = 0;
     looper_status.ghost_bar_counter = 0;
     looper_status.lfo_phase = 0;
+    midi_sync_tick = 0;
 }
 
 // Poll button events, process them, and update the status LED.
