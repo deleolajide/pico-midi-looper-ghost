@@ -13,7 +13,8 @@
 **Pico MIDI Looper "Ghost" Edition** is a USB-MIDI drum machine that transforms simple rhythmic input into rich, expressive patterns —  all on a stock Raspberry Pi Pico.  
 You tap out a rhythm using a single button. The device records the sequence of button presses over a two-bar span, and then replays it with ghost notes —  subtle, generative variations that breathe life into the beat.
 
-There is no screen. No knobs. No software to install. You connect the Pico to your computer or mobile device, and it shows up as a USB-MIDI instrument.  
+There is no screen, no knobs, and no extra software. Plug in via USB and start playing—even sync multiple units via MIDI clock for ensemble performances.  
+
 From there, you can use it with GarageBand, Ableton Live, or any DAW or soft synth that supports MIDI input.
 
 Everything runs directly on the Pico itself —  no additional components, soldering, or host software are required.  
@@ -24,17 +25,17 @@ A ghost lives within the device.
 - **Two-bar, four-track MIDI drum machine** built from the simplest possible components
   A one-button interface records your rhythm. Ghost notes expand it.
   It’ s an exploration of how complex rhythm can arise from minimal control.
-- **Ghost note generation**: adds swing, density, and surprise to basic patterns
-- **USB-MIDI output**: works with DAWs and mobile music apps (e.g., GarageBand on iOS)
-- **No display or controls**: the interface is minimalist, but expressive
+- **Generative ghost notes**: subtle variations that bring simple taps to life  
+- **Minimalist control**: record and shape your beat with a single button  
+- **USB-MIDI & sync**: instant DAW compatibility and seamless MIDI-clock ensemble mode  
+- **Loop memory**: your pattern persists across power cycles (long-hold to clear)  
 - **Runs on an unmodified Pico**: no soldering, batteries, or external parts
-- **Fully standalone firmware**: no host-side software or configuration needed
 
 ## Demo
 
 Watch it in action:
 
-[YouTube –  "Ghost" Demo1](https://www.youtube.com/shorts/-Et41TXjqLs)
+[YouTube – "Ghost" Demo1](https://www.youtube.com/shorts/-Et41TXjqLs)
 
 [Demo2](https://www.youtube.com/shorts/ndGxzRGGCx0)
 
