@@ -87,6 +87,7 @@ void display_update_looper_status(bool output_connected, const looper_status_t *
         switch (looper->state) {
             case LOOPER_STATE_PLAYING:
             case LOOPER_STATE_TRACK_SWITCH:
+            case LOOPER_STATE_SYNC_PLAYING:
                 state_label = "[PLAYING]";
                 label_color = ANSI_CALM_GREEN;
                 break;
@@ -98,13 +99,17 @@ void display_update_looper_status(bool output_connected, const looper_status_t *
                 state_label = "[TAP TEMPO]";
                 label_color = ANSI_BRIGHT_MAGENTA;
                 break;
+            case LOOPER_STATE_SYNC_MUTE:
+                state_label = "[MUTE]";
+                label_color = ANSI_BRIGHT_MAGENTA;
+                break;
             default:
                 break;
         }
     }
     printf("   %s%-12s%s", label_color, state_label, ANSI_RESET);
 
-    printf(" %s♩=%3u\n" ANSI_RESET,
+    printf(" %s♩=%3lu\n" ANSI_RESET,
            ((looper->current_step % LOOPER_CLICK_DIV) == 0 ? ANSI_BOLD : ANSI_BRIGHT_BLACK),
            looper->bpm);
 

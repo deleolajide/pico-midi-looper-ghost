@@ -17,6 +17,7 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
   pico_stdlib
   drivers
 )
+target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -Werror -Wall -Wextra -Wnull-dereference -Wno-missing-field-initializers)
 pico_enable_stdio_usb(${CMAKE_PROJECT_NAME} 1)
 pico_add_extra_outputs(${CMAKE_PROJECT_NAME})
 
@@ -29,6 +30,8 @@ add_library(drivers
   drivers/storage.c
 )
 target_include_directories(drivers PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include)
+target_compile_options(drivers PRIVATE -Werror -Wall -Wextra -Wnull-dereference)
+
 target_link_libraries(drivers
   pico_stdlib
   tinyusb_device
@@ -42,6 +45,8 @@ if(PICO_CYW43_SUPPORTED)
     pico_cyw43_arch_none
   )
   pico_btstack_make_gatt_header(drivers PRIVATE ${CMAKE_CURRENT_LIST_DIR}/midi_service.gatt)
+  target_compile_options(pico_btstack_ble INTERFACE -Wno-null-dereference -Wno-unused-variable)
+  target_compile_options(pico_cyw43_driver INTERFACE -Wno-unused-parameter)
 else()
   target_sources(drivers PRIVATE drivers/ble_midi_noop.c)
   target_link_libraries(drivers

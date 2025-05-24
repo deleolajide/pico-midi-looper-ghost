@@ -42,3 +42,5 @@ void ghost_note_create(track_t *track);
 void ghost_note_maintenance_step(void);
 
 ghost_parameters_t *ghost_note_parameters(void);
+
+void ghost_note_set_fillin_queue(void);

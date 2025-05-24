@@ -41,7 +41,7 @@ int main(void) {
         looper_handle_input();
         usb_midi_task();
 
-        sleep_us(500);
+        sleep_us(100);
     }
     return 0;
 }

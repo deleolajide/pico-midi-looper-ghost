@@ -29,7 +29,6 @@ typedef enum {
 
 static btstack_packet_callback_registration_t hci_event_callback_registration;
 static hci_con_handle_t con_handle = HCI_CON_HANDLE_INVALID;
-static btstack_timer_source_t step_timer;
 
 static void start_advertising(void) {
     uint16_t adv_int_min = 800;

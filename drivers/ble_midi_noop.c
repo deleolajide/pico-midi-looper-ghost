@@ -2,6 +2,10 @@
 
 void ble_midi_init() { }
 
-void ble_midi_send_note(uint8_t channel, uint8_t note, uint8_t velocity) { }
+void ble_midi_send_note(uint8_t channel, uint8_t note, uint8_t velocity) {
+    (void)channel;
+    (void)note;
+    (void)velocity;
+}
 
 bool ble_midi_is_connected(void) { return false; }
