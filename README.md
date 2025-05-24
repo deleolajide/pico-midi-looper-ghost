@@ -34,8 +34,11 @@ A ghost lives within the device.
 
 Watch it in action:
 
-[YouTube –  "Ghost" Edition Demo1](https://www.youtube.com/shorts/-Et41TXjqLs)
+[YouTube –  "Ghost" Demo1](https://www.youtube.com/shorts/-Et41TXjqLs)
+
 [Demo2](https://www.youtube.com/shorts/ndGxzRGGCx0)
+
+[Multi-Pico Session (MIDI-Clock Synced)](https://www.youtube.com/shorts/ILG_zTqI8x4)
 
 ## Getting Started
 
