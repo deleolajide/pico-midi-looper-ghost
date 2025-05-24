@@ -20,8 +20,8 @@
 #include "drivers/button.h"
 #include "drivers/display.h"
 #include "drivers/led.h"
-#include "drivers/usb_midi.h"
 #include "drivers/storage.h"
+#include "drivers/usb_midi.h"
 #include "ghost_note.h"
 #include "tap_tempo.h"
 
@@ -50,8 +50,8 @@ static track_t tracks[] = {
 };
 static const size_t NUM_TRACKS = sizeof(tracks) / sizeof(track_t);
 
-static uint32_t midi_sync_tick = 0;
-static uint64_t midi_sync_tick_latest_us = 0;
+static uint32_t midi_clock_tick_count = 0;
+static uint64_t midi_clock_last_tick_us = 0;
 
 // Check if the note output destination is ready.
 static bool looper_perform_ready(void) {
@@ -234,6 +234,28 @@ void looper_process_state(uint64_t start_us) {
             looper_next_step(start_us);
             looper_status.state = LOOPER_STATE_PLAYING;
             break;
+        default:
+            break;
+    }
+
+    looper_status.lfo_phase += LFO_RATE;
+    ghost_note_maintenance_step();
+}
+
+static void looper_process_state_external_clock(uint64_t start_us) {
+    bool ready = looper_perform_ready();
+    display_update_looper_status(ready, &looper_status, tracks, NUM_TRACKS);
+    if (!ready)
+        looper_status.state = LOOPER_STATE_WAITING;
+    switch (looper_status.state) {
+        case LOOPER_STATE_WAITING:
+            if (ready) {
+                looper_status.state = LOOPER_STATE_PLAYING;
+                looper_status.current_step = 0;
+            }
+            led_set((looper_status.current_step % (LOOPER_CLICK_DIV * 4)) == 0);
+            looper_next_step(start_us);
+            break;
         case LOOPER_STATE_SYNC_PLAYING:
             looper_perform_step();
             led_set(1);
@@ -320,10 +342,12 @@ void looper_handle_tick(async_context_t *ctx, async_at_time_worker_t *worker) {
 static void looper_audit_midi_sync(async_context_t *ctx, async_at_time_worker_t *worker) {
     uint64_t now_us = time_us_64();
 
-    if (looper_status.state == LOOPER_STATE_SYNC_PLAYING || looper_status.state == LOOPER_STATE_SYNC_MUTE) {
-        if (now_us - midi_sync_tick_latest_us > 250000) {
+    if (looper_status.clock_source == LOOPER_CLOCK_EXTERNAL) {
+        if (now_us - midi_clock_last_tick_us > 250000) {
             looper_status.state = LOOPER_STATE_WAITING;
-            async_context_add_at_time_worker_in_ms(ctx, &looper_status.tick_timer, looper_get_step_interval_ms());
+            looper_status.clock_source = LOOPER_CLOCK_INTERNAL;
+            async_context_add_at_time_worker_in_ms(ctx, &looper_status.tick_timer,
+                                                   looper_get_step_interval_ms());
         }
     }
     async_context_add_at_time_worker_in_ms(ctx, worker, 1000);
@@ -331,10 +355,12 @@ static void looper_audit_midi_sync(async_context_t *ctx, async_at_time_worker_t 
 
 void looper_handle_midi_tick(void) {
     uint64_t start_us = time_us_64();
-    midi_sync_tick++;
-    static uint64_t delta6 = 0;
+    midi_clock_tick_count++;
+    static uint64_t accumulated_tick_interval_us = 0;
 
-    if (looper_status.state != LOOPER_STATE_SYNC_PLAYING && looper_status.state != LOOPER_STATE_SYNC_MUTE) {
+    if (looper_status.clock_source == LOOPER_CLOCK_INTERNAL) {
+        looper_status.clock_source = LOOPER_CLOCK_EXTERNAL;
+
         async_context_t *ctx = async_timer_async_context();
         async_context_remove_at_time_worker(ctx, &looper_status.tick_timer);
 
@@ -344,46 +370,56 @@ void looper_handle_midi_tick(void) {
             looper_status.state = LOOPER_STATE_SYNC_PLAYING;
     }
 
-    uint64_t delta_us = start_us - midi_sync_tick_latest_us;
-    delta6 += delta_us;
+    uint64_t delta_us = start_us - midi_clock_last_tick_us;
+    accumulated_tick_interval_us += delta_us;
 
-    if (midi_sync_tick % 6 == 0) {
-        looper_process_state(start_us);
+    if (midi_clock_tick_count % 6 == 0) {
+        looper_process_state_external_clock(start_us);
 
-        float bpm = 60000000.0f / ((delta6 / 6) * 24.0f);
+        float bpm = 60000000.0f / ((accumulated_tick_interval_us / 6) * 24.0f);
         looper_update_bpm(bpm);
-        delta6 = 0;
+        accumulated_tick_interval_us = 0;
     }
 
-    midi_sync_tick_latest_us = start_us;
+    midi_clock_last_tick_us = start_us;
 }
 
 void looper_handle_midi_start(void) {
     looper_status.current_step = 0;
     looper_status.ghost_bar_counter = 0;
     looper_status.lfo_phase = 0;
-    midi_sync_tick = 0;
+    midi_clock_tick_count = 0;
+}
+
+static void looper_handle_input_internal_clock(button_event_t event) {
+    if (looper_status.state == LOOPER_STATE_TAP_TEMPO) {
+        if (taptempo_handle_button_event(event) == TAP_EXIT)
+            looper_status.state = LOOPER_STATE_PLAYING;
+    } else {
+        looper_handle_button_event(event);
+    }
+}
+
+static void looper_handle_input_external_clock(button_event_t event) {
+    if (event == BUTTON_EVENT_HOLD_RELEASE || event == BUTTON_EVENT_LONG_HOLD_RELEASE ||
+        event == BUTTON_EVENT_VERY_LONG_HOLD_RELEASE) {
+        if (looper_status.state == LOOPER_STATE_SYNC_PLAYING)
+            looper_status.state = LOOPER_STATE_SYNC_MUTE;
+        else
+            looper_status.state = LOOPER_STATE_SYNC_PLAYING;
+    } else if (event == BUTTON_EVENT_CLICK_RELEASE) {
+        ghost_note_set_fillin_queue();
+    }
 }
 
 // Poll button events, process them, and update the status LED.
 void looper_handle_input(void) {
     button_event_t event = button_poll_event();
-    if (looper_status.state == LOOPER_STATE_TAP_TEMPO) {
-        if (taptempo_handle_button_event(event) == TAP_EXIT)
-            looper_status.state = LOOPER_STATE_PLAYING;
-    } else if (looper_status.state == LOOPER_STATE_SYNC_PLAYING || looper_status.state == LOOPER_STATE_SYNC_MUTE) {
-        if (event == BUTTON_EVENT_CLICK_RELEASE ||
-            event == BUTTON_EVENT_HOLD_RELEASE ||
-            event == BUTTON_EVENT_LONG_HOLD_RELEASE ||
-            event == BUTTON_EVENT_VERY_LONG_HOLD_RELEASE) {
-            if (looper_status.state == LOOPER_STATE_SYNC_PLAYING)
-                looper_status.state = LOOPER_STATE_SYNC_MUTE;
-            else
-                looper_status.state = LOOPER_STATE_SYNC_PLAYING;
-        }
-    } else {
-        looper_handle_button_event(event);
-    }
+    if (looper_status.clock_source == LOOPER_CLOCK_INTERNAL)
+        looper_handle_input_internal_clock(event);
+    else
+        looper_handle_input_external_clock(event);
+
     led_update();
 }
 
@@ -392,7 +428,8 @@ void looper_schedule_step_timer(void) {
 
     looper_status.tick_timer.do_work = looper_handle_tick;
     async_context_t *ctx = async_timer_async_context();
-    async_context_add_at_time_worker_in_ms(ctx, &looper_status.tick_timer, looper_get_step_interval_ms());
+    async_context_add_at_time_worker_in_ms(ctx, &looper_status.tick_timer,
+                                           looper_get_step_interval_ms());
 
     looper_status.sync_timer.do_work = looper_audit_midi_sync;
     async_context_add_at_time_worker_in_ms(ctx, &looper_status.sync_timer, 1000);

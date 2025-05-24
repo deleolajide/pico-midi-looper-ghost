@@ -22,14 +22,19 @@ typedef enum {
     LOOPER_STATE_TRACK_SWITCH,  // Switching to next track.
     LOOPER_STATE_TAP_TEMPO,
     LOOPER_STATE_CLEAR_TRACKS,
-    LOOPER_STATE_SYNC_MUTE,          // MIDI Clock slave: synced, muted (waiting to play)
-    LOOPER_STATE_SYNC_PLAYING        // MIDI Clock slave: synced, playing (sound on)
+    LOOPER_STATE_SYNC_MUTE,     // MIDI Clock slave: synced, muted (waiting to play)
+    LOOPER_STATE_SYNC_PLAYING   // MIDI Clock slave: synced, playing (sound on)
 } looper_state_t;
 
 typedef struct {
     uint64_t last_step_time_us;      // Time of last step transition
     uint64_t button_press_start_us;  // Timestamp when button was pressed
 } looper_timing_t;
+
+typedef enum {
+    LOOPER_CLOCK_INTERNAL = 0,  // Local timer (self-clocking)
+    LOOPER_CLOCK_EXTERNAL,      // MIDI clock
+} looper_clock_source_t;
 
 /*
  * Runtime playback state, managed globally.
@@ -41,12 +46,13 @@ typedef struct {
     looper_state_t state;          // Current looper mode (e.g. PLAYING, RECORDING).
     uint8_t current_track;         // Index of the active track (for recording or preview).
     uint8_t current_step;          // Index of the current step in the sequence loop.
-    uint8_t recording_step_count;  // Number of steps recorded so far in this session.
+    uint8_t recording_step_count;  // Step count for ongoing recording session (resets on new record).
     looper_timing_t timing;
     uint8_t ghost_bar_counter;
     uint16_t lfo_phase;
-    async_at_time_worker_t tick_timer;
-    async_at_time_worker_t sync_timer;
+    looper_clock_source_t clock_source;
+    async_at_time_worker_t tick_timer;  // Step timer (internal clock mode)
+    async_at_time_worker_t sync_timer;  // MIDI sync watchdog timer
 } looper_status_t;
 
 typedef struct {
