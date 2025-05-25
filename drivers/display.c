@@ -36,11 +36,11 @@
 #define ANSI_DISABLE_ALTSCREEN "\x1b[?1049l"
 
 // Prints a single track row with step highlighting and note indicators.
-static void print_track(const track_t *track, uint8_t current_step, bool is_selected) {
+static void print_track(const track_t *track, uint8_t track_number, bool is_selected) {
     if (is_selected)
-        printf("  " ANSI_BOLD ">%-11s [", track->name);
+        printf("#track %u > %-11s ", track_number + 1, track->name);
     else
-        printf("  " ANSI_BRIGHT_BLACK " %-11s " ANSI_RESET ANSI_BOLD "[", track->name);
+        printf("#track %u _ %-11s ", track_number + 1, track->name);
 
     ghost_parameters_t *params = ghost_note_parameters();
     for (int i = 0; i < LOOPER_TOTAL_STEPS; ++i) {
@@ -49,15 +49,7 @@ static void print_track(const track_t *track, uint8_t current_step, bool is_sele
             ((float)track->ghost_notes[i].probability / 100.0f) * params->ghost_intensity >
             (float)track->ghost_notes[i].rand_sample / 100.0f;
         bool fill_on = track->fill_pattern[i];
-        if (current_step == i && note_on)
-            printf(ANSI_BG_WHITE ANSI_BLACK "*" ANSI_RESET ANSI_BOLD);
-        else if (current_step == i && fill_on)
-            printf(ANSI_BG_WHITE ANSI_BLACK "+" ANSI_RESET ANSI_BOLD);
-        else if (current_step == i && ghost_on)
-            printf(ANSI_BG_WHITE ANSI_BLACK "." ANSI_RESET ANSI_BOLD);
-        else if (current_step == i && (!note_on && !fill_on))
-            printf(ANSI_BG_WHITE ANSI_BLACK "_" ANSI_RESET ANSI_BOLD);
-        else if (note_on)
+        if (note_on)
             printf("*");
         else if (fill_on)
             printf("+");
@@ -66,58 +58,53 @@ static void print_track(const track_t *track, uint8_t current_step, bool is_sele
         else
             printf("_");
     }
-    printf("]\n" ANSI_RESET);
+    printf("\n");
+}
+
+static void print_step(uint8_t current_step) {
+    printf("#step                  ");
+    for (int i = 0; i < LOOPER_TOTAL_STEPS; ++i) {
+        if (i == current_step)
+            printf("^");
+        else
+            printf("_");
+    }
+    printf("\n");
 }
 
 // Displays the looper's playback state, connection status, and track patterns.
 void display_update_looper_status(bool output_connected, const looper_status_t *looper,
                                   const track_t *tracks, size_t num_tracks) {
-    printf(ANSI_ENABLE_ALTSCREEN);
-
-    if (looper->current_step % LOOPER_TOTAL_STEPS == 0)
-        printf(ANSI_CLEAR_HOME);
-    printf(ANSI_HIDE_CURSOR);
-    printf(ANSI_CURSOR_FMT ANSI_CLEAR_EOL, 1, 1);
-
-    printf(ANSI_BOLD "\n                    #Pico_MIDI_Looper \"Ghost\"\n\n" ANSI_RESET);
-
-    const char *state_label = "[WAITING]";
-    const char *label_color = ANSI_BRIGHT_BLUE;
+    const char *state_label = "WAITING";
     if (output_connected) {
         switch (looper->state) {
             case LOOPER_STATE_PLAYING:
             case LOOPER_STATE_TRACK_SWITCH:
             case LOOPER_STATE_SYNC_PLAYING:
-                state_label = "[PLAYING]";
-                label_color = ANSI_CALM_GREEN;
+                state_label = "PLAYING";
                 break;
             case LOOPER_STATE_RECORDING:
-                state_label = "[RECORDING]";
-                label_color = ANSI_SOFT_RED;
+                state_label = "RECORDING";
                 break;
             case LOOPER_STATE_TAP_TEMPO:
-                state_label = "[TAP TEMPO]";
-                label_color = ANSI_BRIGHT_MAGENTA;
+                state_label = "TAP TEMPO";
                 break;
             case LOOPER_STATE_SYNC_MUTE:
-                state_label = "[MUTE]";
-                label_color = ANSI_BRIGHT_MAGENTA;
+                state_label = "MUTE";
                 break;
             default:
                 break;
         }
     }
-    printf("   %s%-12s%s", label_color, state_label, ANSI_RESET);
+    printf("#state %s\n", state_label);
 
-    printf(" %s♩=%3lu\n" ANSI_RESET,
-           ((looper->current_step % LOOPER_CLICK_DIV) == 0 ? ANSI_BOLD : ANSI_BRIGHT_BLACK),
-           looper->bpm);
+    printf("#bpm %3lu\n", looper->bpm);
 
-    printf(ANSI_BOLD "                1   2   3   4   5   6   7   8\n" ANSI_RESET);
+    printf("#grid                  1   2   3   4   5   6   7   8\n");
 
     // Display tracks in order from cymbals to basses, like a typical drum machine.
     for (int8_t i = num_tracks - 1; i >= 0; i--)
-        print_track(&tracks[i], looper->current_step, i == looper->current_track);
-
+        print_track(&tracks[i], i, i == looper->current_track);
+    print_step(looper->current_step);
     fflush(stdout);
 }

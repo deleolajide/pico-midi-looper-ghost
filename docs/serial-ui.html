@@ -1,0 +1,104 @@
+// ------ UI 要素参照 ------
+const ui = {
+  btn  : document.getElementById('btn'),
+  term : document.getElementById('term'),
+};
+
+// ------ 状態定義 ------
+const State = {
+  WAITING    : 'WAITING',     // 待機
+  SELECTING  : 'SELECTING',   // ポート選択中
+  OPENING    : 'OPENING',     // open() 中
+  DISPLAYING : 'DISPLAYING',  // 表示中
+};
+
+let current = State.WAITING;
+let port, reader;             // SerialPort / Reader
+
+// ------ 状態遷移を一括管理する関数 ------
+async function go(next) {
+  current = next;
+  console.log('[FSM]', current);
+
+  switch (current) {
+
+    // --- 待機 ---
+    case State.WAITING:
+      ui.btn.textContent = 'Connect';
+      ui.term.textContent = '';
+      break;
+
+    // --- ポート選択 ---
+    case State.SELECTING:
+      ui.btn.textContent = 'キャンセル不可…'; // ダイアログ中はボタン無効
+      try {
+        port = await navigator.serial.requestPort();
+        go(State.OPENING);
+      } catch {
+        go(State.WAITING);                  // ユーザがキャンセル
+      }
+      break;
+
+    // --- ポートオープン中 ---
+    case State.OPENING:
+      ui.btn.textContent = 'Opening…';
+      try {
+        await port.open({ baudRate: 115200 });
+        startReader();                      // 読み取り開始
+        ui.btn.textContent = 'Disconnect';
+        go(State.DISPLAYING);
+      } catch (e) {
+        alert('Open 失敗: ' + e.message);
+        go(State.WAITING);
+      }
+      break;
+
+    // --- 表示中 ---
+    case State.DISPLAYING:
+      // 表示処理は reader ループ内で続行
+      break;
+  }
+}
+
+// ------ 読み取りループ ------
+async function startReader() {
+  const decoder = port.readable
+    .pipeThrough(new TextDecoderStream())
+    .pipeThrough(new TransformStream({
+      start(c) { this.buf = ''; },
+      transform(chunk, c) {                 // 行ごとに分割
+        this.buf += chunk;
+        const lines = this.buf.split(/\r?\n/);
+        this.buf = lines.pop();             // 末尾の半端を保持
+        lines.forEach(l => c.enqueue(l));
+      }
+    }));
+
+  reader = decoder.getReader();
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      renderLine(value);
+    }
+  } finally {
+    await reader.releaseLock();
+    await port.close();
+    go(State.WAITING);                      // 切断後は待機へ
+  }
+}
+
+// ------ 行を <pre> に追加 ------
+function renderLine(line) {
+  ui.term.textContent += line + '\n';
+  ui.term.scrollTop = ui.term.scrollHeight;
+}
+
+// ------ ボタン挙動 ------
+ui.btn.addEventListener('click', () => {
+  if (current === State.WAITING)      go(State.SELECTING);
+  else if (current === State.DISPLAYING) reader.cancel(); // → finally で切断
+});
+
+// 初期化
+go(State.WAITING);
