@@ -48,8 +48,7 @@ Watch it in action:
 3. Drag and drop the `.uf2` file onto the USB mass storage device that appears.
 4. The device will reboot and show up as a USB-MIDI class-compliant device.
 5. Open your favorite DAW or mobile music app (GarageBand, Ableton, etc.). When you hear a click, it's ready. Press the button to begin your dialogue with the ghost.
-6. *Optional:* For a browser-based, real-time pattern viewer, open  
-    [https://oyama.github.io/pico-midi-looper-ghost/serial-ui.html]("Ghost" Web Serial UI) in Chrome or Edge, connect your Pico via USB,  
+6. *Optional:* For a browser-based, real-time pattern viewer, open ["Ghost" Web Serial UI](https://oyama.github.io/pico-midi-looper-ghost/serial-ui.html) in Chrome or Edge, connect your Pico via USB,  
     and click **CONNECT…**.
 
 ## Technology Background
