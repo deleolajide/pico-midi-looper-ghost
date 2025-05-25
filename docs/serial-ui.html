@@ -79,7 +79,7 @@
 
     #grid {
       display: grid; gap: 2px;
-      transition: opacity .3s ease; max-width: 100vw;
+      /* transition: opacity .3s ease; max-width: 100vw; */
     }
     #grid.fade { opacity: 0; }
 
@@ -89,9 +89,11 @@
       border-radius: 4px;
       --cell: calc((75vw - var(--label-width)) / 32);
       width: clamp(16px, var(--cell), 28px);
+      /*
       transition:
         background-color .15s cubic-bezier(0.4,0,0.2,1),
         transform .1s ease;
+      */
       box-shadow: 0 1px 3px rgba(0,0,0,0.6);
     }
     .cell.on    { background: var(--note-on); }
