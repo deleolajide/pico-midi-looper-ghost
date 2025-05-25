@@ -46,7 +46,7 @@ static track_t tracks[] = {
     {"Bass", BASS_DRUM, MIDI_CHANNEL10, {0}, {0}},
     {"Snare", SNARE_DRUM, MIDI_CHANNEL10, {0}, {0}},
     {"Hi-hat", CLOSED_HIHAT, MIDI_CHANNEL10, {0}, {0}},
-    {"Hand clap", HAND_CLAP, MIDI_CHANNEL10, {0}, {0}},
+    {"Hand-clap", HAND_CLAP, MIDI_CHANNEL10, {0}, {0}},
 };
 static const size_t NUM_TRACKS = sizeof(tracks) / sizeof(track_t);
 
