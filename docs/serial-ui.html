@@ -1,104 +1,384 @@
-// ------ UI 要素参照 ------
-const ui = {
-  btn  : document.getElementById('btn'),
-  term : document.getElementById('term'),
-};
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <meta name="license" content="SPDX-License-Identifier: BSD-3-Clause" />
+  <title>“Ghost” – Minimal Drum Machine</title>
+  <link href="https://fonts.googleapis.com/css2?
+    family=Inter:wght@400;600;700|
+    Roboto+Mono:wght@400;700&display=swap"
+    rel="stylesheet" />
+  <style>
+    :root {
+      --label-width: 10ch;
+      --bg-base: #0f0f0f;
+      --grid-border: #444;
+      --note-on: #ff00ff;
+      --note-ghost: #883388;
+      --note-fill: #ff8800;
+      --play-cyan: #00ffff;
+    }
 
-// ------ 状態定義 ------
-const State = {
-  WAITING    : 'WAITING',     // 待機
-  SELECTING  : 'SELECTING',   // ポート選択中
-  OPENING    : 'OPENING',     // open() 中
-  DISPLAYING : 'DISPLAYING',  // 表示中
-};
+    html, body {
+      height: 100%; margin: 0;
+      display: flex; flex-direction: column;
+      justify-content: center;
+      align-items: stretch;    /* allow children to fill width */
+      gap: 0; padding: 0; box-sizing: border-box;
+    }
 
-let current = State.WAITING;
-let port, reader;             // SerialPort / Reader
+    html, body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-base); color: #fff;
+    }
 
-// ------ 状態遷移を一括管理する関数 ------
-async function go(next) {
-  current = next;
-  console.log('[FSM]', current);
+    #main-ui {
+      display: block;           /* full-width block */
+      width: 100%;              /* stretch to container edges */
+    }
 
-  switch (current) {
+    h1 {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      font-weight: 600; font-size: 2.1rem;
+      text-align: center;
+    }
 
-    // --- 待機 ---
-    case State.WAITING:
-      ui.btn.textContent = 'Connect';
-      ui.term.textContent = '';
-      break;
+    #status {
+      width: var(--label-width);
+      margin: 4px 0;
+      font-family: 'Inter', sans-serif;
+      font-size: 1.35rem;
+      text-align: right;
+    }
+    #state { font-weight: 700; }
+    #state.st-playing   { color: #00ff00; }  /* green */
+    #state.st-recording { color: #ff2222; }  /* red   */
+    #state.st-tap-tempo { color: #888888; }  /* gray  */
+    #state.st-mute      { color: #ff00ff; }  /* magenta */
 
-    // --- ポート選択 ---
-    case State.SELECTING:
-      ui.btn.textContent = 'キャンセル不可…'; // ダイアログ中はボタン無効
-      try {
-        port = await navigator.serial.requestPort();
-        go(State.OPENING);
-      } catch {
-        go(State.WAITING);                  // ユーザがキャンセル
+    #bpm { margin-top: 2px; font-weight: bold; font-size:1.4rem; }
+    #bpm-num {
+      color: #555; transition: color 0.1s linear;
+    }
+    #bpm-num.bright { color: #fff !important; }
+
+    .track-label {
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+      text-align: right; padding-right: .5rem;
+      width: var(--label-width);
+      white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 1.35rem;
+    }
+    .track-label.track-active {
+      background: #fff; color: #000;
+    }
+
+    #grid {
+      display: grid; gap: 2px;
+      transition: opacity .3s ease; max-width: 100vw;
+    }
+    #grid.fade { opacity: 0; }
+
+    .cell {
+      aspect-ratio: 1/1; background: #000;
+      border: 1px solid var(--grid-border);
+      border-radius: 4px;
+      --cell: calc((75vw - var(--label-width)) / 32);
+      width: clamp(16px, var(--cell), 28px);
+      transition:
+        background-color .15s cubic-bezier(0.4,0,0.2,1),
+        transform .1s ease;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.6);
+    }
+    .cell.on    { background: var(--note-on); }
+    .cell.ghost {
+      background: var(--note-ghost);
+      border: 1px dashed rgba(136,0,136,0.8);
+    }
+    .cell.fill {
+      background: var(--note-fill);
+      border: 1px solid rgba(255,136,0,0.8);
+    }
+    .cell.playing { background: #fff; }
+    .cell.on.playing,
+    .cell.ghost.playing,
+    .cell.fill.playing {
+      background: var(--play-cyan);
+      border: 1px solid #fff;
+      box-shadow: 0 0 8px var(--play-cyan);
+    }
+
+    .num-label {
+      font-family: 'Inter', sans-serif;
+      text-align: center; font-size: 1.35rem; line-height: 1.2;
+    }
+
+    #btn-connect {
+      font-family: inherit;
+      font-size: 1.1rem;
+      padding: 4px 10px;
+      border: 2px solid #fff;
+      background: #000; color: #fff;
+      cursor: pointer;
+    }
+    #btn-connect:hover { background: #222; }
+  </style>
+</head>
+
+<body>
+  <h1>“Ghost” – Minimal Drum Machine</h1>
+  <div id="main-ui">
+    <div id="status">
+      <span id="state">WAITING</span>
+      <span id="bpm">BPM <span id="bpm-num">120</span></span>
+    </div>
+    <div id="grid"></div>
+  </div>
+
+  <script type="module">
+    // Early exit for unsupported browsers
+    if (!('serial' in navigator)) {
+      document.body.innerHTML = `
+        <div style="
+          display:flex;
+          flex-direction:column;
+          justify-content:center;
+          align-items:center;
+          height:100vh;
+          margin:0;
+          background:#000;
+          color:#fff;
+          font-family:sans-serif;
+          text-align:center;
+          padding:1rem;
+        ">
+          <h2>Web Serial API Not Supported</h2>
+          <p>Please open this page in a desktop version of Chrome or Edge that supports the Web Serial API.</p>
+        </div>`;
+      throw new Error('Web Serial API not supported');
+    }
+
+    // USB VID/PID filter for Raspberry Pi Pico
+    const filters = [{ usbVendorId: 0xCafe, usbProductId: 0x4009 }];
+
+    let lostPortInfo = null;
+    let reconnectPollId = null;
+
+    function sameInfo(a, b) {
+      return a.usbVendorId   === b.usbVendorId &&
+             a.usbProductId  === b.usbProductId &&
+             (a.serialNumber || '') === (b.serialNumber || '');
+    }
+
+    navigator.serial.addEventListener('disconnect', e => {
+      const port = e.target || e.port;
+      console.log('Disconnected:', port.getInfo());
+      lostPortInfo = port.getInfo();
+
+      // start polling for that same port to reappear
+      if (!reconnectPollId) {
+        reconnectPollId = setInterval(async () => {
+          const ports = await navigator.serial.getPorts();
+          const match = ports.find(p => sameInfo(p.getInfo(), lostPortInfo));
+          if (match) {
+            clearInterval(reconnectPollId);
+            reconnectPollId = null;
+            console.log('Auto–reconnect via polling');
+            await connect(match);
+            lostPortInfo = null;
+          }
+        }, 1000);
       }
-      break;
+    });
 
-    // --- ポートオープン中 ---
-    case State.OPENING:
-      ui.btn.textContent = 'Opening…';
+    navigator.serial.addEventListener('connect', async e => {
+      // use e.target (SerialPort) or fallback
+      const port = e.target || e.port;
+      console.log('Connect event:', port.getInfo());
+      if (!activePort &&
+          lostPortInfo &&
+          sameInfo(port.getInfo(), lostPortInfo)
+      ) {
+        console.log('Auto–reconnect via event');
+        await connect(port);
+
+        lostPortInfo = null;
+        if (reconnectPollId) clearInterval(reconnectPollId);
+        reconnectPollId = null;
+      }
+    });
+
+    const stateSpan = document.getElementById('state');
+    const bpmNum = document.getElementById('bpm-num');
+    let activePort = null, reader = null;
+    const TRACKS = 4;
+    let STEPS = 32, gridBuilt = false;
+    let prevIdx = null;
+
+    buildGrid(STEPS);
+    showConnect();
+
+    async function connect(port) {
+      if (activePort) await disconnect();
       try {
         await port.open({ baudRate: 115200 });
-        startReader();                      // 読み取り開始
-        ui.btn.textContent = 'Disconnect';
-        go(State.DISPLAYING);
+        activePort = port;
+        readLoop();
       } catch (e) {
-        alert('Open 失敗: ' + e.message);
-        go(State.WAITING);
+        alert(`Connection failed: ${e.message}`);
       }
-      break;
-
-    // --- 表示中 ---
-    case State.DISPLAYING:
-      // 表示処理は reader ループ内で続行
-      break;
-  }
-}
-
-// ------ 読み取りループ ------
-async function startReader() {
-  const decoder = port.readable
-    .pipeThrough(new TextDecoderStream())
-    .pipeThrough(new TransformStream({
-      start(c) { this.buf = ''; },
-      transform(chunk, c) {                 // 行ごとに分割
-        this.buf += chunk;
-        const lines = this.buf.split(/\r?\n/);
-        this.buf = lines.pop();             // 末尾の半端を保持
-        lines.forEach(l => c.enqueue(l));
-      }
-    }));
-
-  reader = decoder.getReader();
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      renderLine(value);
     }
-  } finally {
-    await reader.releaseLock();
-    await port.close();
-    go(State.WAITING);                      // 切断後は待機へ
-  }
-}
 
-// ------ 行を <pre> に追加 ------
-function renderLine(line) {
-  ui.term.textContent += line + '\n';
-  ui.term.scrollTop = ui.term.scrollHeight;
-}
+    async function disconnect() {
+      if (reader) { await reader.cancel(); reader = null; }
+      if (activePort) { await activePort.close(); activePort = null; }
+      showConnect();
+    }
 
-// ------ ボタン挙動 ------
-ui.btn.addEventListener('click', () => {
-  if (current === State.WAITING)      go(State.SELECTING);
-  else if (current === State.DISPLAYING) reader.cancel(); // → finally で切断
-});
+    async function readLoop() {
+      const decoder = activePort.readable
+        .pipeThrough(new TextDecoderStream())
+        .pipeThrough(new TransformStream({
+          start(c) { this.buf = ''; },
+          transform(chunk, c) {
+            this.buf += chunk;
+            const lines = this.buf.split(/\r?\n/);
+            this.buf = lines.pop();
+            lines.forEach(l => c.enqueue(l));
+          }
+        }));
+      reader = decoder.getReader();
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+         parseLine(value);
+        }
+      } catch (e) {
+        // on USB unplug this throws NetworkError: “device lost”
+        if (e.name === 'NetworkError') {
+          console.warn('Device disconnected, cleaning up');
+        } else {
+          console.error('Serial read error:', e);
+        }
+      } finally {
+        // cancel the reader if still active
+        if (reader) {
+          try { await reader.cancel(); }
+          catch {}
+          reader = null;
+        }
+        await disconnect();
+      }
+    };
 
-// 初期化
-go(State.WAITING);
+    function showConnect() {
+      stateSpan.innerHTML = '<button id="btn-connect">CONNECT…</button>';
+      document
+        .getElementById('btn-connect')
+        .onclick = async () => {
+          try {
+            const port = await navigator.serial.requestPort({ filters });
+            if (port) await connect(port);
+          } catch {}
+        };
+    }
+
+    function parseLine(line) {
+      if (line.startsWith('#grid')) {
+        const cols = line.replace(/^#grid\s+/, '').trim().split(/\s+/).length;
+        STEPS = cols * 4;
+        if (!gridBuilt) buildGrid(STEPS);
+      }
+      else if (line.startsWith('#track')) {
+        updateTrack(line);
+      }
+      else if (line.startsWith('#bpm')) {
+        const m = line.match(/^#bpm\s+(\d+(\.\d+)?)/);
+        if (m) bpmNum.textContent = m[1];
+      }
+      else if (line.startsWith('#state')) {
+        const m = line.match(/^#state\s+(\w+)/);
+        if (!m || m[1] === 'WAITING') return;
+        stateSpan.textContent = m[1];
+        stateSpan.className = '';
+        const cls = {
+          PLAYING: 'st-playing',
+          RECORDING: 'st-recording',
+          'TAP-TEMPO': 'st-tap-tempo',
+          MUTE: 'st-mute'
+        }[m[1]];
+        if (cls) stateSpan.classList.add(cls);
+      }
+      else if (line.startsWith('#step')) {
+        updatePlayhead(line);
+      }
+    }
+
+    function buildGrid(count) {
+      const grid = document.getElementById('grid');
+      grid.classList.add('fade');
+      grid.innerHTML = '';
+      grid.style.gridTemplateColumns = `auto repeat(${count},1fr)`;
+      grid.appendChild(Object.assign(document.createElement('span'), { className:'num-blank' }));
+      for (let i = 0; i < count; i++) {
+        const lbl = document.createElement('span');
+        lbl.className = 'num-label';
+        lbl.textContent = i % 4 === 0 ? (i/4 + 1) : '';
+        grid.appendChild(lbl);
+      }
+      for (let t = TRACKS; t > 0; t--) {
+        const label = document.createElement('span');
+        label.id = `label-${t}`;
+        label.className = 'track-label';
+        label.textContent = `Track ${t}`;
+        grid.appendChild(label);
+        for (let i = 0; i < count; i++) {
+          const cell = document.createElement('span');
+          cell.className = 'cell';
+          cell.dataset.t = t;
+          cell.dataset.s = i;
+          grid.appendChild(cell);
+        }
+      }
+      gridBuilt = true;
+      requestAnimationFrame(() => grid.classList.remove('fade'));
+    }
+
+    function updateTrack(line) {
+      const m = line.match(
+        /^#track\s+(\d+)\s+([_>])\s+([\w-]+)\s+([*_+.]+)$/
+      );
+      if (!m) return;
+      const [ , tr, flag, name, pat ] = m;
+      const t = +tr;
+      if (t < 1 || t > TRACKS) return;
+      const lbl = document.getElementById(`label-${t}`);
+      lbl.textContent = name;
+      lbl.classList.toggle('track-active', flag === '>');
+      [...pat].forEach((ch,s) => {
+        const cell = document.querySelector(`.cell[data-t="${t}"][data-s="${s}"]`);
+        cell.className = 'cell';
+        if (ch==='*') cell.classList.add('on');
+        else if (ch=='.') cell.classList.add('ghost');
+        else if (ch==='+') cell.classList.add('fill');
+      });
+    }
+
+    function updatePlayhead(line) {
+      const idx = [...line.replace(/^#step\s+/,'')].indexOf('^');
+      if (idx < 0 || idx === prevIdx) return;
+      document.querySelectorAll(`.cell[data-s="${prevIdx}"].playing`)
+        .forEach(c=>c.classList.remove('playing'));
+      document.querySelectorAll(`.cell[data-s="${idx}"]`)
+        .forEach(c=>c.classList.add('playing'));
+      prevIdx = idx;
+      bpmNum.classList.toggle('bright', idx % 4 === 0);
+    }
+  </script>
+</body>
+</html>
