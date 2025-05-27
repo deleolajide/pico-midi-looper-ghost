@@ -94,3 +94,5 @@ void looper_handle_midi_start(void);
 void looper_handle_input(void);
 
 void looper_schedule_step_timer(void);
+
+void looper_perform_note(uint8_t channel, uint8_t note, uint8_t velocity);

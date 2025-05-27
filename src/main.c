@@ -10,6 +10,7 @@
 #include "pico/stdlib.h"
 
 #include "looper.h"
+#include "note_scheduler.h"
 #include "drivers/led.h"
 #include "drivers/ble_midi.h"
 #include "drivers/usb_midi.h"
@@ -24,24 +25,25 @@
  *  - Button events (looper_handle_input) for user-driven updates
  */
 int main(void) {
-    stdio_init_all();
-    led_init();
-
     usb_midi_init();
     ble_midi_init();
+    stdio_init_all();
+    led_init();
 
     storage_load_tracks();
 
     // Async timer + sequencer tick setup
     async_timer_init();
     looper_schedule_step_timer();
+    note_scheduler_start_timer();
 
     printf("[MAIN] Pico MIDI Looper start\n");
     while (true) {
         looper_handle_input();
         usb_midi_task();
 
-        sleep_us(100);
+        note_scheduler_flush_notes();
+        tight_loop_contents();
     }
     return 0;
 }
