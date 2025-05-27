@@ -1,75 +1,98 @@
-#include <stdint.h>
+/*
+ * note_scheduler.c
+ *
+ * This module provides precise scheduling of MIDI notes to be played at
+ * specific timestamps. It uses async_context to register time-based callbacks
+ * and defers actual note execution to the main loop for safe USB transmission.
+ *
+ * Note: This separation avoids USB mutex contention and ensures timing consistency
+ *       without relying on hardware interrupts.
+ *
+ * Copyright 2025, Hiroyuki OYAMA
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 #include "pico/multicore.h"
 #include "pico/time.h"
-#include "note_scheduler.h"
+
 #include "looper.h"
+#include "note_scheduler.h"
+#include "drivers/async_timer.h"
 
-#define NOTE_TIMER_INTERVAL_US 1000
-#define MAX_SCHEDULED_NOTES 16
+#define MAX_SCHEDULED_NOTES 32
 
+// One-time pending note event to be dispatched from the main loop
 typedef struct {
-    uint64_t time_us;
     uint8_t channel;
     uint8_t note;
     uint8_t velocity;
-} note_scheduler_note_t;
+    bool valid;
+} pending_note_t;
 
-static repeating_timer_t note_timer;
+// Scheduled note with its async worker and parameters
+typedef struct {
+    async_at_time_worker_t worker;
+    pending_note_t pending;
+} scheduled_note_slot_t;
 
-static note_scheduler_note_t note_queue[MAX_SCHEDULED_NOTES];
-static size_t note_queue_len = 0;
-static note_scheduler_note_t send_queue[MAX_SCHEDULED_NOTES];
-static size_t send_queue_len = 0;
-static critical_section_t send_queue_cs;
+static scheduled_note_slot_t scheduled_slots[MAX_SCHEDULED_NOTES];
+static pending_note_t pending_notes[MAX_SCHEDULED_NOTES];
+static critical_section_t pending_notes_cs;
 
-static bool note_timer_callback(repeating_timer_t *t) {
-    (void)t;
-    uint64_t now = time_us_64();
-    for (size_t i = 0; i < note_queue_len;) {
-        if (note_queue[i].time_us <= now) {
-            critical_section_enter_blocking(&send_queue_cs);
-            if (send_queue_len < MAX_SCHEDULED_NOTES)
-                send_queue[send_queue_len++] = note_queue[i];
-            critical_section_exit(&send_queue_cs);
+// Initialize the note scheduler
+void note_scheduler_init(void) { critical_section_init(&pending_notes_cs); }
 
-            for (size_t j = i; j < note_queue_len - 1; j++) {
-                note_queue[j] = note_queue[j + 1];
-            }
-            if (note_queue_len > 0)
-                note_queue_len--;
-        } else {
-            i++;
+/*
+ * Worker callback invoked by async_context at the scheduled time.
+ * Adds the pending note to the pending_notes to be executed from the main loop.
+ */
+static void note_worker_enqueue_pending(async_context_t *ctx, async_at_time_worker_t *worker) {
+    (void)ctx;
+    scheduled_note_slot_t *slot = (scheduled_note_slot_t *)worker;
+
+    critical_section_enter_blocking(&pending_notes_cs);
+    for (size_t i = 0; i < MAX_SCHEDULED_NOTES; i++) {
+        if (!pending_notes[i].valid) {
+            pending_notes[i] = (pending_note_t){slot->pending.channel, slot->pending.note,
+                                                slot->pending.velocity, true};
+            break;
         }
     }
-    return true;
+
+    slot->worker.do_work = NULL;  // mark as unused
+    critical_section_exit(&pending_notes_cs);
 }
 
-void note_scheduler_start_timer(void) {
-    critical_section_init(&send_queue_cs);
-    add_repeating_timer_us(-NOTE_TIMER_INTERVAL_US, note_timer_callback, NULL, &note_timer);
-}
+/*
+ * Schedule a note to be triggered at a specific absolute time in microseconds.
+ * Returns false if the scheduling queue is full.
+ */
+bool note_scheduler_schedule_note(uint64_t time_us, uint8_t channel, uint8_t note,
+                                  uint8_t velocity) {
+    absolute_time_t note_at = to_us_since_boot(time_us);
 
-bool note_scheduler_schedule_note(uint64_t time_us, uint8_t channel, uint8_t note, uint8_t velocity) {
-    uint32_t irq_state = save_and_disable_interrupts();
-
-    if (note_queue_len < MAX_SCHEDULED_NOTES) {
-        note_queue[note_queue_len++] = (note_scheduler_note_t){
-            .time_us = time_us,
-            .channel = channel,
-            .note = note,
-            .velocity = velocity
-        };
-        restore_interrupts(irq_state);
-        return true;
+    for (size_t i = 0; i < MAX_SCHEDULED_NOTES; i++) {
+        if (scheduled_slots[i].worker.do_work == NULL) {
+            scheduled_slots[i] = (scheduled_note_slot_t){
+                .pending = {.channel = channel, .note = note, .velocity = velocity},
+                .worker = {.do_work = note_worker_enqueue_pending}};
+            async_context_add_at_time_worker_at(async_timer_async_context(),
+                                                &scheduled_slots[i].worker, note_at);
+            return true;
+        }
     }
-    restore_interrupts(irq_state);
     return false;
 }
 
-void note_scheduler_flush_notes(void) {
-    critical_section_enter_blocking(&send_queue_cs);
-    for (size_t i = 0; i < send_queue_len; i++)
-        looper_perform_note(send_queue[i].channel, send_queue[i].note, send_queue[i].velocity);
-    send_queue_len = 0;
-    critical_section_exit(&send_queue_cs);
+// Called from the main loop to process all pending scheduled notes.
+void note_scheduler_dispatch_pending(void) {
+    critical_section_enter_blocking(&pending_notes_cs);
+    for (size_t i = 0; i < MAX_SCHEDULED_NOTES; i++) {
+        if (pending_notes[i].valid) {
+            looper_perform_note(pending_notes[i].channel, pending_notes[i].note,
+                                pending_notes[i].velocity);
+            pending_notes[i].valid = false;
+        }
+    }
+    critical_section_exit(&pending_notes_cs);
 }

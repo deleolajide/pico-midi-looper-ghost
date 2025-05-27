@@ -23,8 +23,8 @@
 #include "drivers/storage.h"
 #include "drivers/usb_midi.h"
 #include "ghost_note.h"
-#include "tap_tempo.h"
 #include "note_scheduler.h"
+#include "tap_tempo.h"
 
 enum {
     MIDI_CHANNEL1 = 0,
@@ -102,7 +102,8 @@ static void looper_perform_step(void) {
         bool note_on = tracks[i].pattern[looper_status.current_step];
         if (note_on) {
             uint8_t velocity = ghost_note_modulate_base_velocity(i, 0x7f, looper_status.lfo_phase);
-            note_scheduler_schedule_note(now + swing_offset_us, tracks[i].channel, tracks[i].note, velocity);
+            note_scheduler_schedule_note(now + swing_offset_us, tracks[i].channel, tracks[i].note,
+                                         velocity);
 
             if (i == looper_status.current_track)
                 led_set(1);
@@ -116,9 +117,11 @@ static void looper_perform_step(void) {
             (float)tracks[i].ghost_notes[looper_status.current_step].rand_sample / 100.0f;
 
         if (ghost_note_on && !tracks[i].fill_pattern[looper_status.current_step])
-            note_scheduler_schedule_note(now + swing_offset_us, tracks[i].channel, tracks[i].note, ghost_note_velocity[i]);
+            note_scheduler_schedule_note(now + swing_offset_us, tracks[i].channel, tracks[i].note,
+                                         ghost_note_velocity[i]);
         if (tracks[i].fill_pattern[looper_status.current_step] && !note_on)
-            note_scheduler_schedule_note(now + swing_offset_us, tracks[i].channel, tracks[i].note, 0x7f);
+            note_scheduler_schedule_note(now + swing_offset_us, tracks[i].channel, tracks[i].note,
+                                         0x7f);
     }
 }
 
@@ -132,7 +135,8 @@ static void looper_perform_step_recording(void) {
     for (uint8_t i = 0; i < NUM_TRACKS; i++) {
         bool note_on = tracks[i].pattern[looper_status.current_step];
         if (note_on)
-            note_scheduler_schedule_note(now + swing_offset_us, tracks[i].channel, tracks[i].note, 0x7f);
+            note_scheduler_schedule_note(now + swing_offset_us, tracks[i].channel, tracks[i].note,
+                                         0x7f);
     }
 }
 
@@ -355,8 +359,13 @@ static void looper_audit_midi_sync(async_context_t *ctx, async_at_time_worker_t 
 
     if (looper_status.clock_source == LOOPER_CLOCK_EXTERNAL) {
         if (now_us - midi_clock_last_tick_us > 250000) {
+            looper_status.current_step = 0;
+            looper_status.ghost_bar_counter = 0;
+            looper_status.lfo_phase = 0;
+
             looper_status.state = LOOPER_STATE_WAITING;
             looper_status.clock_source = LOOPER_CLOCK_INTERNAL;
+
             async_context_add_at_time_worker_in_ms(ctx, &looper_status.tick_timer,
                                                    looper_get_step_interval_ms());
         }

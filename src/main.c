@@ -7,15 +7,15 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 #include <stdio.h>
-#include "pico/stdlib.h"
 
+#include "drivers/async_timer.h"
+#include "drivers/ble_midi.h"
+#include "drivers/led.h"
+#include "drivers/storage.h"
+#include "drivers/usb_midi.h"
 #include "looper.h"
 #include "note_scheduler.h"
-#include "drivers/led.h"
-#include "drivers/ble_midi.h"
-#include "drivers/usb_midi.h"
-#include "drivers/async_timer.h"
-#include "drivers/storage.h"
+#include "pico/stdlib.h"
 
 /*
  * Entry point for the Pico MIDI Looper application.
@@ -35,15 +35,13 @@ int main(void) {
     // Async timer + sequencer tick setup
     async_timer_init();
     looper_schedule_step_timer();
-    note_scheduler_start_timer();
+    note_scheduler_init();
 
     printf("[MAIN] Pico MIDI Looper start\n");
     while (true) {
         looper_handle_input();
         usb_midi_task();
-
-        note_scheduler_flush_notes();
-        tight_loop_contents();
+        note_scheduler_dispatch_pending();
     }
     return 0;
 }
