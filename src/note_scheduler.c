@@ -12,14 +12,14 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
+#include "note_scheduler.h"
+
+#include "drivers/async_timer.h"
+#include "looper.h"
 #include "pico/multicore.h"
 #include "pico/time.h"
 
-#include "looper.h"
-#include "note_scheduler.h"
-#include "drivers/async_timer.h"
-
-#define MAX_SCHEDULED_NOTES 32
+#define MAX_SCHEDULED_NOTES 24
 
 // One-time pending note event to be dispatched from the main loop
 typedef struct {

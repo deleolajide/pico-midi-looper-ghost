@@ -1,3 +1,8 @@
+/*
+ * Copyright 2025, Hiroyuki OYAMA
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 #include "pico/async_context.h"
 
 void ble_midi_init() { }

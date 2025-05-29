@@ -11,11 +11,12 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
+#include "tap_tempo.h"
+
 #include <stdbool.h>
 #include <stdint.h>
-#include "pico/time.h"
 
-#include "tap_tempo.h"
+#include "pico/time.h"
 
 // Configuration constants
 enum {

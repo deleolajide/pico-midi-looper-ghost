@@ -1,3 +1,8 @@
+/*
+ * Copyright 2025, Hiroyuki OYAMA
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 #pragma once
 
 #include "pico/async_context.h"
@@ -42,7 +47,7 @@ typedef enum {
  */
 typedef struct {
     uint32_t bpm;
-    uint32_t step_duration_ms;
+    uint32_t step_period_ms;
     looper_state_t state;          // Current looper mode (e.g. PLAYING, RECORDING).
     uint8_t current_track;         // Index of the active track (for recording or preview).
     uint8_t current_step;          // Index of the current step in the sequence loop.
@@ -77,8 +82,6 @@ void looper_status_led_init(void);
 looper_status_t *looper_status_get(void);
 
 track_t *looper_tracks_get(size_t *num_tracks);
-
-uint32_t looper_get_step_interval_ms(void);
 
 void looper_update_bpm(uint32_t bpm);
 

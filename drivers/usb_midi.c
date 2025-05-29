@@ -1,8 +1,13 @@
+/*
+ * Copyright 2025, Hiroyuki OYAMA
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 #include "bsp/board_api.h"
-#include "pico/bootrom.h"
-#include "tusb.h"
 #include "ghost_note.h"
 #include "looper.h"
+#include "pico/bootrom.h"
+#include "tusb.h"
 
 #define _PID_MAP(itf, n) ((CFG_TUD_##itf) << (n))
 #define USB_PID                                                                            \
@@ -51,21 +56,22 @@ enum {
 uint8_t const desc_configuration[] = {
     TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, CONFIG_TOTAL_LEN, 0x00, 100),
     TUD_MIDI_DESCRIPTOR(ITF_NUM_MIDI, STRID_MIDI_IFACE, EPNUM_MIDI_OUT, (0x80 | EPNUM_MIDI_IN), 64),
-    TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, STRID_CDC_IFACE, EPNUM_CDC_NOTIF, 8, EPNUM_CDC_OUT, EPNUM_CDC_IN, 64)};
+    TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, STRID_CDC_IFACE, EPNUM_CDC_NOTIF, 8, EPNUM_CDC_OUT,
+                       EPNUM_CDC_IN, 64)};
 
 uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
     (void)index;
     return desc_configuration;
 }
 
-const char * const string_desc_arr[] = {
+const char *const string_desc_arr[] = {
     (const char[]){0x09, 0x04},  // 0: is supported language is English (0x0409)
     /* 1‑3 : generic device strings */
-    "TinyUSB",                   // 1: Manufacturer
-    "Pico MIDI Looper",          // 2: Product
-    "",                          // 3: Serial, dynamically generated
-    "Pico USB MIDI Interface",   // 4: iInterface (MIDI)
-    "Pico USB CDC Console",      // 5: iInterface (CDC)
+    "TinyUSB",                  // 1: Manufacturer
+    "Pico MIDI Looper",         // 2: Product
+    "",                         // 3: Serial, dynamically generated
+    "Pico USB MIDI Interface",  // 4: iInterface (MIDI)
+    "Pico USB CDC Console",     // 5: iInterface (CDC)
 };
 
 static uint16_t descriptor_string_buffer[32 + 1];
@@ -95,7 +101,8 @@ uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
             // Cap at max char
             chr_count = strlen(str);
             const size_t max_count =
-                sizeof(descriptor_string_buffer) / sizeof(descriptor_string_buffer[0]) - 1;  // -1 for string type
+                sizeof(descriptor_string_buffer) / sizeof(descriptor_string_buffer[0]) -
+                1;  // -1 for string type
             if (chr_count > max_count) {
                 chr_count = max_count;
             }
@@ -176,7 +183,8 @@ static void update_ghost_parameters(uint8_t channel, uint8_t cc, uint8_t value) 
             params->euclidean.k_max = (uint8_t)clamp((int)value, 1, params->euclidean.k_max);
             break;
         case MIDI_CC_SOUND_CONTROLLER3:  // euclidean k_sufficient (0-k_max)
-            params->euclidean.k_sufficient = (uint8_t)clamp((int)value, 0, params->euclidean.k_sufficient);
+            params->euclidean.k_sufficient =
+                (uint8_t)clamp((int)value, 0, params->euclidean.k_sufficient);
             break;
         case MIDI_CC_SOUND_CONTROLLER4:  // euclidean k_intensity (0.0-1.0)
             params->euclidean.k_intensity = value / 127.0f;
@@ -184,17 +192,17 @@ static void update_ghost_parameters(uint8_t channel, uint8_t cc, uint8_t value) 
         case MIDI_CC_SOUND_CONTROLLER5:  // euclidean probability (0.0-1.0)
             params->euclidean.probability = value / 127.0f;
             break;
-        case MIDI_CC_SOUND_CONTROLLER6:  // flame before_probability (0.0-1.0)
-            params->flams.before_probability = value / 127.0f;
+        case MIDI_CC_SOUND_CONTROLLER6:  // boundary before_probability (0.0-1.0)
+            params->boundary.before_probability = value / 127.0f;
             break;
-        case MIDI_CC_SOUND_CONTROLLER7:  // flame after_probability (0.0-1.0)
-            params->flams.after_probability = value / 127.0f;
+        case MIDI_CC_SOUND_CONTROLLER7:  // boundary after_probability (0.0-1.0)
+            params->boundary.after_probability = value / 127.0f;
             break;
         case MIDI_CC_SOUND_CONTROLLER8:  // fill start_mean (0.0-MAX_MEAN)
             params->fill.start_mean = (value / 127.0f) * 32;
             break;
         case MIDI_CC_SOUND_CONTROLLER9:  // fill start_sd (0.0-MAX_SD)
-            params->fill.start_sd   = (value / 127.0f) * 16;
+            params->fill.start_sd = (value / 127.0f) * 16;
             break;
         case MIDI_CC_SOUND_CONTROLLER10:  // fill probability (0.0-1.0)
             params->fill.probability = value / 127.0f;
