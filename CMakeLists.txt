@@ -11,6 +11,7 @@ add_executable(${CMAKE_PROJECT_NAME}
   src/looper.c
   src/tap_tempo.c
   src/ghost_note.c
+  src/note_scheduler.c
 )
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include)
 target_link_libraries(${CMAKE_PROJECT_NAME}

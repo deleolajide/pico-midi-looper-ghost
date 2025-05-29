@@ -16,7 +16,8 @@ static async_context_threadsafe_background_t tick_async_context;
 
 void async_timer_init(void) {
 #if !defined(CYW43_ENABLE_BLUETOOTH)
-    async_context_threadsafe_background_config_t config = async_context_threadsafe_background_default_config();
+    async_context_threadsafe_background_config_t config =
+        async_context_threadsafe_background_default_config();
     if (async_context_threadsafe_background_init(&tick_async_context, &config)) {
         ;
     }

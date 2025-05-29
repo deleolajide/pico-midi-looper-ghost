@@ -1,3 +1,8 @@
+/*
+ * Copyright 2025, Hiroyuki OYAMA
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 #include "ghost_note.h"
 
 #include <math.h>
@@ -6,16 +11,17 @@
 
 #include "looper.h"
 
-#define PROBABILITY(p) ((rand() / (RAND_MAX + 1.0)) < (p))
+#define DENSITY_WIN_HALF 8
+#define CHANCE(p) ((rand() / (RAND_MAX + 1.0)) < (p))
 
 static float note_density_track_window[4][LOOPER_TOTAL_STEPS];
 
-static bool fillin_queue = false;
+static bool pending_fill_request = false;
 
 static ghost_parameters_t parameters = {
     .ghost_intensity = 0.843,
     .swing_ratio = 0.5,
-    .flams = {.before_probability = 0.10, .after_probability = 0.50},
+    .boundary = {.before_probability = 0.10, .after_probability = 0.50},
     .euclidean = {.k_max = 16, .k_sufficient = 6, .k_intensity = 0.90, .probability = 0.80},
     .fill = {.interval_bar = 4, .start_mean = 15.0, .start_sd = 5.0, .probability = 0.40},
 };
@@ -166,22 +172,22 @@ static void add_euclidean_ghost_notes(track_t *track) {
 }
 
 // 1/16th positions around the user input
-static void add_flams_notes(track_t *track) {
-    flams_parameters_t *flams = &parameters.flams;
+static void add_boundary_notes(track_t *track) {
+    boundary_parameters_t *boundary = &parameters.boundary;
 
     for (size_t i = 0; i < LOOPER_TOTAL_STEPS; i++) {
         if (track->pattern[i] &&
             !track->pattern[(LOOPER_TOTAL_STEPS + i - 1) % LOOPER_TOTAL_STEPS] &&
             !track->ghost_notes[i].rand_sample) {
             track->ghost_notes[(LOOPER_TOTAL_STEPS + i - 1) % LOOPER_TOTAL_STEPS].probability =
-                (uint8_t)(flams->before_probability * 100);
+                (uint8_t)(boundary->before_probability * 100);
             track->ghost_notes[(LOOPER_TOTAL_STEPS + i - 1) % LOOPER_TOTAL_STEPS].rand_sample =
                 rand() % 100;
         }
         if (track->pattern[i] && !track->pattern[(i + 1) % LOOPER_TOTAL_STEPS] &&
             !track->ghost_notes[i].rand_sample) {
             track->ghost_notes[(i + 1) % LOOPER_TOTAL_STEPS].probability =
-                (uint8_t)(flams->after_probability * 100);
+                (uint8_t)(boundary->after_probability * 100);
             track->ghost_notes[(i + 1) % LOOPER_TOTAL_STEPS].rand_sample = rand() % 100;
         }
     }
@@ -201,7 +207,7 @@ static void update_density_track_window(void) {
     track_t *tracks = looper_tracks_get(&num_tracks);
     for (size_t t = 0; t < num_tracks; t++) {
         for (size_t i = 0; i < LOOPER_TOTAL_STEPS; i++) {
-            note_density_track_window[t][i] = track_window_density(&tracks[t], i, 8);
+            note_density_track_window[t][i] = track_window_density(&tracks[t], i, DENSITY_WIN_HALF);
         }
     }
 }
@@ -232,8 +238,7 @@ static void add_fillin_notes(void) {
             if (((float)tracks[t].ghost_notes[i].probability / 100.0f) *
                     parameters.ghost_intensity >
                 (float)(tracks[t].ghost_notes[i].rand_sample / 100))
-                tracks[t].fill_pattern[i] =
-                    PROBABILITY(fill->probability * parameters.ghost_intensity);
+                tracks[t].fill_pattern[i] = CHANCE(fill->probability * parameters.ghost_intensity);
         }
     }
 }
@@ -263,8 +268,7 @@ static void add_fillin_notes_now(void) {
             if (((float)tracks[t].ghost_notes[i].probability / 100.0f) *
                     parameters.ghost_intensity >
                 (float)(tracks[t].ghost_notes[i].rand_sample / 100))
-                tracks[t].fill_pattern[i] =
-                    PROBABILITY(fill->probability * parameters.ghost_intensity);
+                tracks[t].fill_pattern[i] = CHANCE(fill->probability * parameters.ghost_intensity);
         }
     }
 }
@@ -284,7 +288,7 @@ void ghost_note_create(track_t *track) {
     memset(track->ghost_notes, 0, sizeof(track->ghost_notes));
 
     add_euclidean_ghost_notes(track);
-    add_flams_notes(track);
+    add_boundary_notes(track);
 }
 
 static inline bool is_first_step(looper_status_t *s) { return s->current_step == 0; }
@@ -300,7 +304,7 @@ static inline bool is_fillin_bar(looper_status_t *s) {
     return s->ghost_bar_counter == (fill->interval_bar - 2);
 }
 
-void ghost_note_set_fillin_queue(void) { fillin_queue = true; }
+void ghost_note_set_pending_fill_request(void) { pending_fill_request = true; }
 
 void ghost_note_maintenance_step(void) {
     looper_status_t *looper_status = looper_status_get();
@@ -325,9 +329,9 @@ void ghost_note_maintenance_step(void) {
                looper_status->state == LOOPER_STATE_PLAYING) {
         if (pattern_density() > 0)
             add_fillin_notes();
-    } else if (fillin_queue) {
+    } else if (pending_fill_request) {
         add_fillin_notes_now();
-        fillin_queue = false;
+        pending_fill_request = false;
     }
 
     parameters.swing_ratio = ghost_note_modulate_swing_ratio(looper_status->lfo_phase);

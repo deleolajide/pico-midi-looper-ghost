@@ -23,6 +23,7 @@
 #include "drivers/storage.h"
 #include "drivers/usb_midi.h"
 #include "ghost_note.h"
+#include "note_scheduler.h"
 #include "tap_tempo.h"
 
 enum {
@@ -59,17 +60,34 @@ static bool looper_perform_ready(void) {
 }
 
 // Send a note event to the output destination.
-static void looper_perform_note(uint8_t channel, uint8_t note, uint8_t velocity) {
+void looper_perform_note(uint8_t channel, uint8_t note, uint8_t velocity) {
     usb_midi_send_note(channel, note, velocity);
     ble_midi_send_note(channel, note, velocity);
+}
+
+static void looper_schedule_note_now(uint8_t channel, uint8_t note, uint8_t velocity) {
+    uint64_t time_us = time_us_64();
+    note_scheduler_schedule_note(time_us, channel, note, velocity);
 }
 
 // Sends a MIDI click at specific steps to indicate rhythm.
 static void send_click_if_needed(void) {
     if ((looper_status.current_step % LOOPER_CLICK_DIV) == 0 && looper_status.current_step == 0)
-        looper_perform_note(MIDI_CHANNEL1, RIM_SHOT, 0x30);
+        looper_schedule_note_now(MIDI_CHANNEL1, RIM_SHOT, 0x20);
     else if ((looper_status.current_step % LOOPER_CLICK_DIV) == 0)
-        looper_perform_note(MIDI_CHANNEL1, RIM_SHOT, 0x10);
+        looper_schedule_note_now(MIDI_CHANNEL1, RIM_SHOT, 0x05);
+}
+
+static uint64_t looper_get_swing_offset_us(uint8_t step_index) {
+    ghost_parameters_t *params = ghost_note_parameters();
+    float swing_ratio = params->swing_ratio;
+    float pair_length = looper_status.step_period_ms * 2.0f;
+
+    if (step_index % 2 == 1) {
+        float offset_ms = pair_length * (swing_ratio - 0.5f);
+        return (uint64_t)(offset_ms * 1000.0f);  // ms → us
+    }
+    return 0;
 }
 
 // Perform all note events for the current step across all tracks.
@@ -77,11 +95,16 @@ static void send_click_if_needed(void) {
 static void looper_perform_step(void) {
     ghost_parameters_t *params = ghost_note_parameters();
 
+    uint64_t now = time_us_64();
+    uint64_t swing_offset_us = looper_get_swing_offset_us(looper_status.current_step);
+
     for (uint8_t i = 0; i < NUM_TRACKS; i++) {
         bool note_on = tracks[i].pattern[looper_status.current_step];
         if (note_on) {
             uint8_t velocity = ghost_note_modulate_base_velocity(i, 0x7f, looper_status.lfo_phase);
-            looper_perform_note(tracks[i].channel, tracks[i].note, velocity);
+            note_scheduler_schedule_note(now + swing_offset_us, tracks[i].channel, tracks[i].note,
+                                         velocity);
+
             if (i == looper_status.current_track)
                 led_set(1);
         } else if (i == looper_status.current_track) {
@@ -94,25 +117,31 @@ static void looper_perform_step(void) {
             (float)tracks[i].ghost_notes[looper_status.current_step].rand_sample / 100.0f;
 
         if (ghost_note_on && !tracks[i].fill_pattern[looper_status.current_step])
-            looper_perform_note(tracks[i].channel, tracks[i].note, ghost_note_velocity[i]);
+            note_scheduler_schedule_note(now + swing_offset_us, tracks[i].channel, tracks[i].note,
+                                         ghost_note_velocity[i]);
         if (tracks[i].fill_pattern[looper_status.current_step] && !note_on)
-            looper_perform_note(tracks[i].channel, tracks[i].note, 0x7f);
+            note_scheduler_schedule_note(now + swing_offset_us, tracks[i].channel, tracks[i].note,
+                                         0x7f);
     }
 }
 
 // Perform note events for the current step while recording.
 // In recording mode, the status LED is always turned on.
 static void looper_perform_step_recording(void) {
+    uint64_t now = time_us_64();
+    uint64_t swing_offset_us = looper_get_swing_offset_us(looper_status.current_step);
+
     led_set(1);
     for (uint8_t i = 0; i < NUM_TRACKS; i++) {
         bool note_on = tracks[i].pattern[looper_status.current_step];
         if (note_on)
-            looper_perform_note(tracks[i].channel, tracks[i].note, 0x7f);
+            note_scheduler_schedule_note(now + swing_offset_us, tracks[i].channel, tracks[i].note,
+                                         0x7f);
     }
 }
 
 // Updates the current step index and timestamp based on current loop progress.
-static void looper_next_step(uint64_t now_us) {
+static void looper_advance_step(uint64_t now_us) {
     looper_status.timing.last_step_time_us = now_us;
     looper_status.current_step = (looper_status.current_step + 1) % LOOPER_TOTAL_STEPS;
 }
@@ -122,21 +151,14 @@ static void looper_next_step(uint64_t now_us) {
  * The result is quantized to the nearest step relative to the last tick.
  */
 static uint8_t looper_quantize_step() {
-    ghost_parameters_t *setting = ghost_note_parameters();
-    float pair_length = looper_status.step_duration_ms * 2;
-    float step_duration_ms = looper_status.step_duration_ms;
     uint8_t previous_step =
         (looper_status.current_step + LOOPER_TOTAL_STEPS - 1) % LOOPER_TOTAL_STEPS;
-    if (previous_step % 2 == 0)
-        step_duration_ms = pair_length * (1.0f - setting->swing_ratio);
-    else
-        step_duration_ms = pair_length * setting->swing_ratio;
-
     int64_t delta_us =
         looper_status.timing.button_press_start_us - looper_status.timing.last_step_time_us;
 
+    float step_period_ms = looper_status.step_period_ms;
     // Convert to step offset using rounding (nearest step)
-    int32_t relative_steps = (int32_t)round((double)delta_us / 1000.0 / step_duration_ms);
+    int32_t relative_steps = (int32_t)round((double)delta_us / 1000.0 / step_period_ms);
     uint8_t estimated_step =
         (previous_step + relative_steps + LOOPER_TOTAL_STEPS) % LOOPER_TOTAL_STEPS;
     return estimated_step;
@@ -176,13 +198,10 @@ track_t *looper_tracks_get(size_t *num) {
     return tracks;
 }
 
-// Retrieve the current step interval in milliseconds.
-uint32_t looper_get_step_interval_ms(void) { return looper_status.step_duration_ms; }
-
 // Update the looper BPM and recalculate the step duration.
 void looper_update_bpm(uint32_t bpm) {
     looper_status.bpm = bpm;
-    looper_status.step_duration_ms = 60000 / (bpm * LOOPER_STEPS_PER_BEAT);
+    looper_status.step_period_ms = 60000 / (bpm * LOOPER_STEPS_PER_BEAT);
 }
 
 // Processes the looper's main state machine, called by the step timer.
@@ -198,12 +217,12 @@ void looper_process_state(uint64_t start_us) {
                 looper_status.current_step = 0;
             }
             led_set((looper_status.current_step % (LOOPER_CLICK_DIV * 4)) == 0);
-            looper_next_step(start_us);
+            looper_advance_step(start_us);
             break;
         case LOOPER_STATE_PLAYING:
             send_click_if_needed();
             looper_perform_step();
-            looper_next_step(start_us);
+            looper_advance_step(start_us);
             break;
         case LOOPER_STATE_RECORDING:
             send_click_if_needed();
@@ -213,25 +232,25 @@ void looper_process_state(uint64_t start_us) {
                 looper_status.state = LOOPER_STATE_PLAYING;
                 storage_store_tracks();
             }
-            looper_next_step(start_us);
+            looper_advance_step(start_us);
             looper_status.recording_step_count++;
             break;
         case LOOPER_STATE_TRACK_SWITCH:
             looper_status.current_track = (looper_status.current_track + 1) % NUM_TRACKS;
-            looper_perform_note(MIDI_CHANNEL10, OPEN_HIHAT, 0x7f);
-            looper_next_step(start_us);
+            looper_schedule_note_now(MIDI_CHANNEL10, OPEN_HIHAT, 0x7f);
+            looper_advance_step(start_us);
             looper_status.state = LOOPER_STATE_PLAYING;
             break;
         case LOOPER_STATE_TAP_TEMPO:
             send_click_if_needed();
             led_set((looper_status.current_step % LOOPER_CLICK_DIV) == 0);
-            looper_next_step(start_us);
+            looper_advance_step(start_us);
             break;
         case LOOPER_STATE_CLEAR_TRACKS:
             looper_clear_all_tracks();
             looper_status.current_track = 0;
             looper_update_bpm(LOOPER_DEFAULT_BPM);
-            looper_next_step(start_us);
+            looper_advance_step(start_us);
             looper_status.state = LOOPER_STATE_PLAYING;
             break;
         default:
@@ -254,16 +273,16 @@ static void looper_process_state_external_clock(uint64_t start_us) {
                 looper_status.current_step = 0;
             }
             led_set((looper_status.current_step % (LOOPER_CLICK_DIV * 4)) == 0);
-            looper_next_step(start_us);
+            looper_advance_step(start_us);
             break;
         case LOOPER_STATE_SYNC_PLAYING:
             looper_perform_step();
             led_set(1);
-            looper_next_step(start_us);
+            looper_advance_step(start_us);
             break;
         case LOOPER_STATE_SYNC_MUTE:
             led_set(0);
-            looper_next_step(start_us);
+            looper_advance_step(start_us);
             break;
         default:
             break;
@@ -281,7 +300,7 @@ void looper_handle_button_event(button_event_t event) {
         case BUTTON_EVENT_DOWN:
             // Button pressed: start timing and preview sound
             looper_status.timing.button_press_start_us = time_us_64();
-            looper_perform_note(track->channel, track->note, 0x7f);
+            looper_schedule_note_now(track->channel, track->note, 0x7f);
             // Backup track pattern in case this press becomes a long-press (undo)
             memcpy(track->hold_pattern, track->pattern, LOOPER_TOTAL_STEPS);
             break;
@@ -306,12 +325,12 @@ void looper_handle_button_event(button_event_t event) {
         case BUTTON_EVENT_LONG_HOLD_RELEASE:
             // ≥2 s hold: enter Tap-tempo (no track switch)
             looper_status.state = LOOPER_STATE_TAP_TEMPO;
-            looper_perform_note(MIDI_CHANNEL10, OPEN_HIHAT, 0x7f);
+            looper_schedule_note_now(MIDI_CHANNEL10, OPEN_HIHAT, 0x7f);
             break;
         case BUTTON_EVENT_VERY_LONG_HOLD_RELEASE:
             // ≥5 s hold: clear track data
             looper_status.state = LOOPER_STATE_CLEAR_TRACKS;
-            looper_perform_note(MIDI_CHANNEL10, CYMBAL, 0x7f);
+            looper_schedule_note_now(MIDI_CHANNEL10, CYMBAL, 0x7f);
             break;
         default:
             break;
@@ -324,14 +343,7 @@ void looper_handle_tick(async_context_t *ctx, async_at_time_worker_t *worker) {
 
     looper_process_state(start_us);
 
-    ghost_parameters_t *setting = ghost_note_parameters();
-    float pair_length = looper_status.step_duration_ms * 2;
-    float step_delay = looper_status.step_duration_ms;
-    if (looper_status.current_step % 2 == 0)
-        step_delay = pair_length * (1.0f - setting->swing_ratio);
-    else
-        step_delay = pair_length * setting->swing_ratio;
-
+    float step_delay = looper_status.step_period_ms;
     uint64_t handler_delay_ms = (time_us_64() - start_us) / 1000;
     uint32_t delay =
         (handler_delay_ms >= (uint32_t)step_delay) ? 1 : (uint32_t)step_delay - handler_delay_ms;
@@ -344,10 +356,15 @@ static void looper_audit_midi_sync(async_context_t *ctx, async_at_time_worker_t 
 
     if (looper_status.clock_source == LOOPER_CLOCK_EXTERNAL) {
         if (now_us - midi_clock_last_tick_us > 250000) {
+            looper_status.current_step = 0;
+            looper_status.ghost_bar_counter = 0;
+            looper_status.lfo_phase = 0;
+
             looper_status.state = LOOPER_STATE_WAITING;
             looper_status.clock_source = LOOPER_CLOCK_INTERNAL;
+
             async_context_add_at_time_worker_in_ms(ctx, &looper_status.tick_timer,
-                                                   looper_get_step_interval_ms());
+                                                   looper_status.step_period_ms);
         }
     }
     async_context_add_at_time_worker_in_ms(ctx, worker, 1000);
@@ -408,7 +425,7 @@ static void looper_handle_input_external_clock(button_event_t event) {
         else
             looper_status.state = LOOPER_STATE_SYNC_PLAYING;
     } else if (event == BUTTON_EVENT_CLICK_RELEASE) {
-        ghost_note_set_fillin_queue();
+        ghost_note_set_pending_fill_request();
     }
 }
 
@@ -429,7 +446,7 @@ void looper_schedule_step_timer(void) {
     looper_status.tick_timer.do_work = looper_handle_tick;
     async_context_t *ctx = async_timer_async_context();
     async_context_add_at_time_worker_in_ms(ctx, &looper_status.tick_timer,
-                                           looper_get_step_interval_ms());
+                                           looper_status.step_period_ms);
 
     looper_status.sync_timer.do_work = looper_audit_midi_sync;
     async_context_add_at_time_worker_in_ms(ctx, &looper_status.sync_timer, 1000);
