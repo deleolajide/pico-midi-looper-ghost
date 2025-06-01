@@ -171,9 +171,6 @@ enum {
 };
 
 static void update_ghost_parameters(uint8_t channel, uint8_t cc, uint8_t value) {
-    if (channel != 15)
-        return;
-
     ghost_parameters_t *params = ghost_note_parameters();
     switch (cc) {
         case MIDI_CC_SOUND_CONTROLLER1:
