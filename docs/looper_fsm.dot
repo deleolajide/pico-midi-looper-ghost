@@ -21,20 +21,20 @@ digraph LooperFSM {
     // Transitions
     Startup -> WAITING         [label=" Power-on"];
 
-    WAITING -> PLAYING         [label=" BLE Connect"];
+    WAITING -> PLAYING         [label=" USB Connect"];
 
-    PLAYING -> WAITING         [label=" BLE Disconnect"];
+    PLAYING -> WAITING         [label=" USB Disconnect"];
     PLAYING -> RECORDING       [label=" Click"];
     PLAYING -> TRACK_SWITCH    [label=" Press"];
     PLAYING -> TAP_TEMPO       [label=" Long press", constraint=false];
     PLAYING -> CLEAR_TRACKS    [label=" Very long press"];
 
-    RECORDING -> WAITING       [label=" BLE Disconnect"];
+    RECORDING -> WAITING       [label=" USB Disconnect"];
     RECORDING -> PLAYING       [label=" 2-bars recorded"];
 
     TRACK_SWITCH -> PLAYING    [label=" Track switched"];
 
-    TAP_TEMPO -> WAITING       [label=" BLE Disconnect"];
+    TAP_TEMPO -> WAITING       [label=" USB Disconnect"];
     TAP_TEMPO -> PLAYING       [label=" Button press"];
 
     CLEAR_TRACKS -> PLAYING    [label=" Deleted"];
