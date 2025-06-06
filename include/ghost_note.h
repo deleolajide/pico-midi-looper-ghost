@@ -6,7 +6,6 @@
 #pragma once
 
 #include "looper.h"
-#include "ghost_note.h"
 
 typedef struct {
     uint8_t k_max;

@@ -178,11 +178,11 @@ static void update_ghost_parameters(uint8_t channel, uint8_t cc, uint8_t value) 
             params->ghost_intensity = value / 127.0f;
             break;
         case MIDI_CC_SOUND_CONTROLLER2:  // euclidean k_max (1-16)
-            params->euclidean.k_max = (uint8_t)clamp((int)value, 1, params->euclidean.k_max);
+            params->euclidean.k_max = (uint8_t)clamp((int)value, 1, 16);
             break;
         case MIDI_CC_SOUND_CONTROLLER3:  // euclidean k_sufficient (0-k_max)
             params->euclidean.k_sufficient =
-                (uint8_t)clamp((int)value, 0, params->euclidean.k_sufficient);
+                (uint8_t)clamp((int)value, 0, params->euclidean.k_max);
             break;
         case MIDI_CC_SOUND_CONTROLLER4:  // euclidean k_intensity (0.0-1.0)
             params->euclidean.k_intensity = value / 127.0f;
