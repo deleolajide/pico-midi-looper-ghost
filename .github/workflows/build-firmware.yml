@@ -53,4 +53,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: workspace_artifacts
-        path: ${{steps.build.outputs.output_dir}
+        path: ${{steps.build.outputs.output_dir}}
