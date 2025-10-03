@@ -47,10 +47,16 @@ jobs:
     - name: Build
       working-directory: ${{github.workspace}}/pico-midi-looper-ghost/build
       shell: bash
-      run: cmake --build . --target pico-midi-looper-ghost --config $BUILD_TYPE
-      
-    - name: Upload Build Artifacts
-      uses: actions/upload-artifact@v4
+      run: cmake --build . --target pico-midi-looper-ghost --config $BUILD_TYPE    
+
+    - name: Rename Binary with Tag
+      working-directory: pico-midi-looper-ghost/build
+      run: |
+        mv pico-midi-looper-ghost.uf2 pico-midi-looper-ghost-${{ github.ref_name }}.uf2
+
+    - name: Create GitHub Release and Upload Binary
+      uses: softprops/action-gh-release@v2
       with:
-        path: ${{steps.build.outputs.output_dir}}
+        files: pico-midi-looper-ghost/build/pico-midi-looper-ghost-${{ github.ref_name }}.uf2
+
         
