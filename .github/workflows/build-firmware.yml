@@ -48,3 +48,10 @@ jobs:
       working-directory: ${{github.workspace}}/pico-midi-looper-ghost/build
       shell: bash
       run: cmake --build . --target pico-midi-looper-ghost --config $BUILD_TYPE
+      
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: workspace_artifacts
+        path: ${{steps.build.outputs.output_dir}}
+          
